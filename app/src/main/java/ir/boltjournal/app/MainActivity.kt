@@ -8,6 +8,7 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -61,29 +62,48 @@ fun MainScreen() {
     val context = LocalContext.current
     val db = remember { AppDatabase.getDatabase(context) }
     val taskDao = db.taskDao()
+    val collectionDao = db.collectionDao()
+    
     val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
+    val collections by collectionDao.getAllItems().collectAsState(initial = emptyList())
 
     val weekDaysList = listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه")
     var selectedWeekDay by remember { mutableStateOf(weekDaysList[0]) }
     var selectedMonthDay by remember { mutableStateOf(PersianDate.getDayOfMonthNumber()) }
+    
+    // وضعیت‌های مربوط به مجموعه‌نگار
+    val defaultCategories = listOf("کتاب‌ها", "فیلم‌ها", "فهرست خرید", "لوازم سفر", "مخاطبین", "یادداشت‌های آزاد")
+    var selectedCategory by remember { mutableStateOf(defaultCategories[0]) }
+    val allCategories = (defaultCategories + collections.map { it.category }).distinct()
 
     var showDialog by remember { mutableStateOf(false) }
     
     var newTaskTitle by remember { mutableStateOf("") }
+    var newTaskDesc by remember { mutableStateOf("") }
     var newTaskPriority by remember { mutableStateOf("GRAY") }
     var newTaskDateString by remember { mutableStateOf("") }
     var newTaskReminderDays by remember { mutableStateOf("0") }
+    var newCategoryName by remember { mutableStateOf("") }
     
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
+    var collectionItemToEdit by remember { mutableStateOf<CollectionItemEntity?>(null) }
     
     val scope = rememberCoroutineScope()
 
+    // باز کردن پنجره برای ویرایش
     val handleEditTask: (TaskEntity) -> Unit = { task ->
         taskToEdit = task
         newTaskTitle = task.title
         newTaskPriority = task.priority
         newTaskDateString = task.dateString
         newTaskReminderDays = task.reminderDays.toString()
+        showDialog = true
+    }
+    
+    val handleEditCollectionItem: (CollectionItemEntity) -> Unit = { item ->
+        collectionItemToEdit = item
+        newTaskTitle = item.title
+        newTaskDesc = item.description
         showDialog = true
     }
 
@@ -98,10 +118,13 @@ fun MainScreen() {
             FloatingActionButton(
                 onClick = { 
                     taskToEdit = null 
+                    collectionItemToEdit = null
                     newTaskTitle = ""
+                    newTaskDesc = ""
                     newTaskPriority = "GRAY"
                     newTaskDateString = ""
                     newTaskReminderDays = "0"
+                    newCategoryName = ""
                     showDialog = true 
                 },
                 containerColor = Gold,
@@ -130,38 +153,47 @@ fun MainScreen() {
             1 -> WeeklyLogScreen(paddingValues, tasks, taskDao, weekDaysList, selectedWeekDay, { selectedWeekDay = it }, handleEditTask)
             2 -> MonthlyLogScreen(paddingValues, tasks, taskDao, selectedMonthDay, { selectedMonthDay = it }, handleEditTask)
             3 -> FutureLogScreen(paddingValues, tasks, taskDao, handleEditTask)
-            else -> Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
-                Text("مجموعه‌نگار به زودی...", fontSize = 18.sp, color = DarkEmerald)
-            }
+            4 -> CollectionScreen(
+                paddingValues = paddingValues, 
+                collections = collections, 
+                collectionDao = collectionDao, 
+                allCategories = allCategories,
+                selectedCategory = selectedCategory,
+                onCategorySelected = { selectedCategory = it },
+                onEditItem = handleEditCollectionItem
+            )
         }
     }
 
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text(if (taskToEdit == null) "افزودن کار جدید" else "ویرایش کار", fontWeight = FontWeight.Bold, color = DarkEmerald) },
+            title = { Text(if (taskToEdit != null || collectionItemToEdit != null) "ویرایش" else "افزودن", fontWeight = FontWeight.Bold, color = DarkEmerald) },
             text = {
                 Column(modifier = Modifier.heightIn(max = 500.dp)) {
-                    OutlinedTextField(value = newTaskTitle, onValueChange = { newTaskTitle = it }, label = { Text("عنوان کار") }, singleLine = true)
-                    Spacer(modifier = Modifier.height(12.dp))
+                    OutlinedTextField(value = newTaskTitle, onValueChange = { newTaskTitle = it }, label = { Text("عنوان") }, singleLine = true)
                     
-                    if (selectedItem == 0) {
-                        Text("اولویت (آیزنهاور):", fontSize = 12.sp, color = Color.Gray)
-                        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
-                            listOf("RED" to EisenhowerRed, "GREEN" to EisenhowerGreen, "ORANGE" to EisenhowerOrange, "GRAY" to EisenhowerGray).forEach { (p, c) ->
-                                Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(c).border(2.dp, if (newTaskPriority == p) Color.Black else Color.Transparent, CircleShape).clickable { newTaskPriority = p })
-                            }
-                        }
-                    } 
-                    else if (selectedItem == 1 && taskToEdit == null) {
-                        Text("این کار به صورت خودکار هر هفته در روز «$selectedWeekDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
-                    } else if (selectedItem == 2 && taskToEdit == null) {
-                        Text("این کار به صورت خودکار هر ماه در روز «$selectedMonthDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
-                    } 
-                    else if (selectedItem == 3) {
-                        OutlinedTextField(value = newTaskDateString, onValueChange = { newTaskDateString = it }, label = { Text("تاریخ آینده (مثلا 1405/12/25)") }, singleLine = true)
+                    if (selectedItem == 4) {
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(value = newTaskReminderDays, onValueChange = { newTaskReminderDays = it }, label = { Text("یادآور چند روز قبل (0=بدون)") }, singleLine = true)
+                        OutlinedTextField(value = newTaskDesc, onValueChange = { newTaskDesc = it }, label = { Text("توضیحات (اختیاری)") }, singleLine = true)
+                        if (collectionItemToEdit == null) {
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(value = newCategoryName, onValueChange = { newCategoryName = it }, label = { Text("مجموعه جدید (اختیاری)") }, placeholder = { Text("اگر خالی باشد، به $selectedCategory اضافه می‌شود") }, singleLine = true)
+                        }
+                    } else {
+                        Spacer(modifier = Modifier.height(12.dp))
+                        if (selectedItem == 0) {
+                            Text("اولویت:", fontSize = 12.sp, color = Color.Gray)
+                            Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
+                                listOf("RED" to EisenhowerRed, "GREEN" to EisenhowerGreen, "ORANGE" to EisenhowerOrange, "GRAY" to EisenhowerGray).forEach { (p, c) ->
+                                    Box(modifier = Modifier.size(30.dp).clip(CircleShape).background(c).border(2.dp, if (newTaskPriority == p) Color.Black else Color.Transparent, CircleShape).clickable { newTaskPriority = p })
+                                }
+                            }
+                        } else if (selectedItem == 3) {
+                            OutlinedTextField(value = newTaskDateString, onValueChange = { newTaskDateString = it }, label = { Text("تاریخ (1405/12/25)") }, singleLine = true)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            OutlinedTextField(value = newTaskReminderDays, onValueChange = { newTaskReminderDays = it }, label = { Text("یادآور چند روز قبل") }, singleLine = true)
+                        }
                     }
                 }
             },
@@ -169,25 +201,22 @@ fun MainScreen() {
                 TextButton(onClick = {
                     if (newTaskTitle.isNotBlank()) {
                         scope.launch {
-                            if (taskToEdit == null) {
-                                val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
-                                val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
-                                
-                                taskDao.insertTask(TaskEntity(
-                                    title = newTaskTitle, 
-                                    priority = newTaskPriority,
-                                    recurrenceType = recType,
-                                    recurrenceValue = recValue,
-                                    dateString = newTaskDateString,
-                                    reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
-                                ))
+                            if (selectedItem == 4) {
+                                val targetCat = if (newCategoryName.isNotBlank()) newCategoryName else selectedCategory
+                                if (collectionItemToEdit == null) {
+                                    collectionDao.insertItem(CollectionItemEntity(category = targetCat, title = newTaskTitle, description = newTaskDesc))
+                                    if (newCategoryName.isNotBlank()) selectedCategory = newCategoryName
+                                } else {
+                                    collectionDao.updateItem(collectionItemToEdit!!.copy(title = newTaskTitle, description = newTaskDesc))
+                                }
                             } else {
-                                taskDao.updateTask(taskToEdit!!.copy(
-                                    title = newTaskTitle,
-                                    priority = newTaskPriority,
-                                    dateString = newTaskDateString,
-                                    reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
-                                ))
+                                if (taskToEdit == null) {
+                                    val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
+                                    val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
+                                    taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = recType, recurrenceValue = recValue, dateString = newTaskDateString, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
+                                } else {
+                                    taskDao.updateTask(taskToEdit!!.copy(title = newTaskTitle, priority = newTaskPriority, dateString = newTaskDateString, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
+                                }
                             }
                             showDialog = false
                         }
@@ -247,9 +276,7 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
                     scope = scope, 
                     showPriority = true, 
                     onEdit = { onEditTask(task) },
-                    onPriorityChange = { newColor -> 
-                        scope.launch { taskDao.updateTask(task.copy(priority = newColor)) }
-                    }
+                    onPriorityChange = { newColor -> scope.launch { taskDao.updateTask(task.copy(priority = newColor)) } }
                 )
             }
         }
@@ -258,16 +285,10 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
 
 @Composable
 fun WeeklyLogScreen(
-    paddingValues: PaddingValues, 
-    tasks: List<TaskEntity>, 
-    taskDao: TaskDao,
-    weekDaysList: List<String>,
-    selectedDay: String,
-    onDaySelected: (String) -> Unit,
-    onEditTask: (TaskEntity) -> Unit
+    paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao,
+    weekDaysList: List<String>, selectedDay: String, onDaySelected: (String) -> Unit, onEditTask: (TaskEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp)
@@ -276,27 +297,18 @@ fun WeeklyLogScreen(
             item {
                 Card(
                     modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
-                    colors = CardDefaults.cardColors(
-                        containerColor = if (selectedDay == day) Cream else Color.White
-                    ),
+                    colors = CardDefaults.cardColors(containerColor = if (selectedDay == day) Cream else Color.White),
                     border = if (selectedDay == day) androidx.compose.foundation.BorderStroke(2.dp, DarkEmerald) else null,
                     elevation = CardDefaults.cardElevation(1.dp),
                     shape = RoundedCornerShape(8.dp)
                 ) {
-                    Column(
-                        modifier = Modifier
-                            .clickable { onDaySelected(day) }
-                            .padding(8.dp)
-                    ) {
+                    Column(modifier = Modifier.clickable { onDaySelected(day) }.padding(8.dp)) {
                         Text(day, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
-                        
                         val dayTasks = tasks.filter { it.recurrenceType == "WEEKLY" && it.recurrenceValue == day }
                         if (dayTasks.isEmpty()) {
                             Text("خالی", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                         } else {
-                            dayTasks.forEach { task -> 
-                                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) 
-                            }
+                            dayTasks.forEach { task -> CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) }
                         }
                     }
                 }
@@ -307,12 +319,8 @@ fun WeeklyLogScreen(
 
 @Composable
 fun MonthlyLogScreen(
-    paddingValues: PaddingValues, 
-    tasks: List<TaskEntity>, 
-    taskDao: TaskDao,
-    selectedDay: String,
-    onDaySelected: (String) -> Unit,
-    onEditTask: (TaskEntity) -> Unit
+    paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao,
+    selectedDay: String, onDaySelected: (String) -> Unit, onEditTask: (TaskEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val monthGrid = remember { PersianDate.getCurrentMonthGrid() }
@@ -334,26 +342,19 @@ fun MonthlyLogScreen(
                 monthGrid.chunked(7).forEach { week ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                         week.forEach { dayInfo ->
-                            if (dayInfo == null) {
-                                Box(modifier = Modifier.size(40.dp))
-                            } else {
+                            if (dayInfo == null) { Box(modifier = Modifier.size(40.dp)) } 
+                            else {
                                 val dayStr = dayInfo.first.toString()
                                 val isSelected = dayStr == selectedDay
                                 val hasTasks = tasks.any { it.recurrenceType == "MONTHLY" && it.recurrenceValue == dayStr }
-                                
                                 Box(
-                                    modifier = Modifier
-                                        .size(40.dp)
-                                        .clip(CircleShape)
-                                        .background(if (isSelected) DarkEmerald else Color.Transparent)
+                                    modifier = Modifier.size(40.dp).clip(CircleShape).background(if (isSelected) DarkEmerald else Color.Transparent)
                                         .border(if (isSelected) 0.dp else 1.dp, if (isSelected) Color.Transparent else Color.LightGray.copy(alpha=0.5f), CircleShape)
                                         .clickable { onDaySelected(dayStr) },
                                     contentAlignment = Alignment.Center
                                 ) {
                                     Text(dayStr, color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
-                                    if (hasTasks) {
-                                        Box(modifier = Modifier.size(5.dp).background(Gold, CircleShape).align(Alignment.BottomCenter).padding(bottom = 4.dp))
-                                    }
+                                    if (hasTasks) { Box(modifier = Modifier.size(5.dp).background(Gold, CircleShape).align(Alignment.BottomCenter).padding(bottom = 4.dp)) }
                                 }
                             }
                         }
@@ -362,19 +363,15 @@ fun MonthlyLogScreen(
                 }
             }
         }
-        
         item {
             Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray)
             Text("کارهای روز $selectedDay ماه", fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
         }
-        
         val monthDayTasks = tasks.filter { it.recurrenceType == "MONTHLY" && it.recurrenceValue == selectedDay }
         if (monthDayTasks.isEmpty()) {
             item { Text("هیچ کاری ثبت نشده است.", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         } else {
-            items(monthDayTasks) { task ->
-                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) })
-            }
+            items(monthDayTasks) { task -> CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) }
         }
     }
 }
@@ -397,9 +394,78 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Cream), shape = RoundedCornerShape(8.dp)) {
                         Column(modifier = Modifier.padding(8.dp)) {
                             Text(date, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
-                            dateTasks.forEach { task -> 
-                                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) 
+                            dateTasks.forEach { task -> CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
+fun CollectionScreen(
+    paddingValues: PaddingValues,
+    collections: List<CollectionItemEntity>,
+    collectionDao: CollectionDao,
+    allCategories: List<String>,
+    selectedCategory: String,
+    onCategorySelected: (String) -> Unit,
+    onEditItem: (CollectionItemEntity) -> Unit
+) {
+    val scope = rememberCoroutineScope()
+    val filteredItems = collections.filter { it.category == selectedCategory }
+
+    Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
+        // نوار افقی دسته‌بندی‌ها
+        LazyRow(
+            modifier = Modifier.fillMaxWidth().padding(8.dp),
+            horizontalArrangement = Arrangement.spacedBy(8.dp)
+        ) {
+            items(allCategories) { category ->
+                FilterChip(
+                    selected = selectedCategory == category,
+                    onClick = { onCategorySelected(category) },
+                    label = { Text(category, fontSize = 12.sp) },
+                    colors = FilterChipDefaults.filterChipColors(
+                        selectedContainerColor = DarkEmerald,
+                        selectedLabelColor = Color.White
+                    )
+                )
+            }
+        }
+
+        // لیست آیتم‌ها
+        if (filteredItems.isEmpty()) {
+            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
+                Text("این مجموعه خالی است.", color = Color.Gray)
+            }
+        } else {
+            LazyColumn(
+                modifier = Modifier.fillMaxSize(),
+                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
+                verticalArrangement = Arrangement.spacedBy(6.dp)
+            ) {
+                items(filteredItems) { item ->
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(1.dp),
+                        shape = RoundedCornerShape(6.dp)
+                    ) {
+                        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                            Text(
+                                text = item.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                                color = if (item.isCompleted) Color.Gray else Color.Black,
+                                textDecoration = if (item.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                modifier = Modifier.weight(1f)
+                            )
+                            if (item.description.isNotEmpty()) {
+                                Text(item.description, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
                             }
+                            IconButton(onClick = { onEditItem(item) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
+                            IconButton(onClick = { scope.launch { collectionDao.updateItem(item.copy(isCompleted = !item.isCompleted)) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (item.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
+                            IconButton(onClick = { scope.launch { collectionDao.deleteItem(item) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
                         }
                     }
                 }
@@ -410,19 +476,10 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
 
 @Composable
 fun CompactTaskItem(
-    task: TaskEntity, 
-    taskDao: TaskDao, 
-    scope: kotlinx.coroutines.CoroutineScope, 
-    showPriority: Boolean, 
-    onEdit: () -> Unit,
-    onPriorityChange: (String) -> Unit = {} // قابلیت تغییر رنگ با کلیک
+    task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, 
+    showPriority: Boolean, onEdit: () -> Unit, onPriorityChange: (String) -> Unit = {}
 ) {
-    val color = when(task.priority) {
-        "RED" -> EisenhowerRed
-        "GREEN" -> EisenhowerGreen
-        "ORANGE" -> EisenhowerOrange
-        else -> EisenhowerGray
-    }
+    val color = when(task.priority) { "RED" -> EisenhowerRed; "GREEN" -> EisenhowerGreen; "ORANGE" -> EisenhowerOrange; else -> EisenhowerGray }
 
     Card(
         modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp),
@@ -432,44 +489,16 @@ fun CompactTaskItem(
     ) {
         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (showPriority) {
-                // نقطه رنگی قابل کلیک برای تغییر سریع اولویت
-                Box(
-                    modifier = Modifier
-                        .size(18.dp)
-                        .clip(CircleShape)
-                        .clickable { 
-                            val nextColor = when(task.priority) {
-                                "RED" -> "GREEN"
-                                "GREEN" -> "ORANGE"
-                                "ORANGE" -> "GRAY"
-                                else -> "RED"
-                            }
-                            onPriorityChange(nextColor) 
-                        },
-                    contentAlignment = Alignment.Center
-                ) {
-                    Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
-                }
+                Box(modifier = Modifier.size(18.dp).clip(CircleShape).clickable { 
+                    val nextColor = when(task.priority) { "RED" -> "GREEN"; "GREEN" -> "ORANGE"; "ORANGE" -> "GRAY"; else -> "RED" }
+                    onPriorityChange(nextColor) 
+                }, contentAlignment = Alignment.Center) { Box(modifier = Modifier.size(10.dp).background(color, CircleShape)) }
                 Spacer(modifier = Modifier.width(8.dp))
             }
-            
-            Text(
-                text = task.title, fontSize = 14.sp, color = if (task.isCompleted) Color.Gray else Color.Black,
-                textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                modifier = Modifier.weight(1f)
-            )
-            
-            IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { 
-                Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) 
-            }
-            
-            IconButton(onClick = { scope.launch { taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) } }, modifier = Modifier.size(30.dp)) { 
-                Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) 
-            }
-            
-            IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { 
-                Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) 
-            }
+            Text(text = task.title, fontSize = 14.sp, color = if (task.isCompleted) Color.Gray else Color.Black, textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None, modifier = Modifier.weight(1f))
+            IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
+            IconButton(onClick = { scope.launch { taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
+            IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
         }
     }
 }
