@@ -8,7 +8,8 @@ data class TaskEntity(
     @PrimaryKey(autoGenerate = true) val id: Int = 0,
     val title: String,
     val description: String = "",
-    val date: Long = System.currentTimeMillis(), // تاریخ ثبت
+    val date: Long = System.currentTimeMillis(),
+    val dateString: String = "", // تاریخ دقیق به شمسی برای گروه‌بندی
     val time: String = "",
     val isCompleted: Boolean = false
 )
