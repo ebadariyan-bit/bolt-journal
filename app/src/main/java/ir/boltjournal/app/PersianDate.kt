@@ -11,43 +11,35 @@ object PersianDate {
         val gMonth = today.monthValue
         val gDay = today.dayOfMonth
 
+        // الگوریتم استاندارد و دقیق تبدیل تاریخ
         val g_d_m = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
-        val gy = gYear - 1600
-        val gm = gMonth - 1
-        val gd = gDay - 1
-
-        var g_day_no = 365 * gy + (gy + 3) / 4 - (gy + 99) / 100 + (gy + 399) / 400
-        for (i in 0 until gm) g_day_no += g_d_m[i]
-
-        if (gm > 1 && ((gYear % 4 == 0 && gYear % 100 != 0) || (gYear % 400 == 0))) {
-            g_day_no++
+        var gy = gYear
+        var jy: Int
+        if (gy > 1600) {
+            jy = 979
+            gy -= 1600
+        } else {
+            jy = 0
+            gy -= 621
         }
-        g_day_no += gd
-
-        var j_day_no = g_day_no - 79
-        val j_np = j_day_no / 12053
-        j_day_no %= 12053
-
-        var jy = 979 + 33 * j_np + 4 * (j_day_no / 1461)
-        j_day_no %= 1461
-
-        if (j_day_no >= 366) {
-            jy += (j_day_no - 1) / 365
-            j_day_no = (j_day_no - 1) % 365
+        val gy2 = if (gMonth > 2) gy + 1 else gy
+        var days = (365 * gy) + ((gy2 + 3) / 4) - ((gy2 + 99) / 100) + ((gy2 + 399) / 400) - 80 + gDay + g_d_m[gMonth - 1]
+        
+        jy += 33 * (days / 12053)
+        days %= 12053
+        jy += 4 * (days / 1461)
+        days %= 1461
+        if (days > 365) {
+            jy += (days - 1) / 365
+            days = (days - 1) % 365
         }
-
-        val jMonthDays = intArrayOf(31, 31, 31, 31, 31, 31, 30, 30, 30, 30, 30, 29)
-        var jm = 0
-        while (jm < 12 && j_day_no >= jMonthDays[jm]) {
-            j_day_no -= jMonthDays[jm]
-            jm++
-        }
-        jm++
-        val jd = j_day_no + 1
+        
+        val jm = if (days < 186) 1 + (days / 31) else 7 + ((days - 186) / 30)
+        val jd = 1 + if (days < 186) (days % 31) else ((days - 186) % 30)
 
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
-        val days = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
+        val daysOfWeek = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
 
-        return "${days[today.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
+        return "${daysOfWeek[today.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
     }
 }
