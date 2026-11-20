@@ -4,14 +4,32 @@ import java.time.LocalDate
 import java.time.ZoneId
 
 object PersianDate {
+    
     fun getCurrentPersianDate(): String {
-        // خواندن تاریخ دقیق تهران
-        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val gYear = today.year
-        val gMonth = today.monthValue
-        val gDay = today.dayOfMonth
+        return getPersianDateFromDate(LocalDate.now(ZoneId.of("Asia/Tehran")))
+    }
 
-        // الگوریتم استاندارد و دقیق تبدیل تاریخ
+    // تابع جدید برای پیدا کردن ۷ روز هفته (شنبه تا جمعه)
+    fun getCurrentWeekDates(): List<String> {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        val todayValue = today.dayOfWeek.value // 1=دوشنبه ... 6=شنبه, 7=یکشنبه
+        
+        // پیدا کردن شنبه این هفته
+        val daysSinceSaturday = (todayValue + 1) % 7 
+        val saturday = today.minusDays(daysSinceSaturday.toLong())
+        
+        val weekDates = mutableListOf<String>()
+        for (i in 0..6) {
+            weekDates.add(getPersianDateFromDate(saturday.plusDays(i.toLong())))
+        }
+        return weekDates
+    }
+
+    private fun getPersianDateFromDate(date: LocalDate): String {
+        val gYear = date.year
+        val gMonth = date.monthValue
+        val gDay = date.dayOfMonth
+
         val g_d_m = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
         var gy = gYear
         var jy: Int
@@ -40,6 +58,6 @@ object PersianDate {
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
         val daysOfWeek = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
 
-        return "${daysOfWeek[today.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
+        return "${daysOfWeek[date.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
     }
 }
