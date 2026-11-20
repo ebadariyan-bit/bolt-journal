@@ -5,10 +5,11 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [TaskEntity::class, DailyNoteEntity::class], version = 5, exportSchema = false)
+@Database(entities = [TaskEntity::class, DailyNoteEntity::class, CollectionItemEntity::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
     abstract fun dailyNoteDao(): DailyNoteDao
+    abstract fun collectionDao(): CollectionDao
 
     companion object {
         @Volatile
