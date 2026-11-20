@@ -5,6 +5,7 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
+// نسخه 6 قفل شد. از این به بعد ساختار دیتابیس تغییر نمی‌کند.
 @Database(entities = [TaskEntity::class, DailyNoteEntity::class, CollectionItemEntity::class], version = 6, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
@@ -21,8 +22,7 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "bolt_journal_database"
-                ).fallbackToDestructiveMigration()
-                .build()
+                ).build() // fallbackToDestructiveMigration حذف شد تا داده‌ها حفظ شوند
                 INSTANCE = instance
                 instance
             }
