@@ -118,17 +118,11 @@ fun MainScreen() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            text = PersianDate.getCurrentPersianDate(),
+                            // اینجا تابع اصلاح شده است
+                            text = PersianDateHelper.getCurrentPersianDate(),
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
-                        )
-                        // این خط برای تست اضافه شده تا تاریخ میلادی گوشی را ببینیم
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "میلادی گوشی: ${java.time.LocalDate.now()}",
-                            color = Color.LightGray,
-                            fontSize = 12.sp
                         )
                     }
                 }
