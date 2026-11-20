@@ -9,12 +9,9 @@ object PersianDate {
         return getPersianDateFromDate(LocalDate.now(ZoneId.of("Asia/Tehran")))
     }
 
-    // تابع جدید برای پیدا کردن ۷ روز هفته (شنبه تا جمعه)
     fun getCurrentWeekDates(): List<String> {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val todayValue = today.dayOfWeek.value // 1=دوشنبه ... 6=شنبه, 7=یکشنبه
-        
-        // پیدا کردن شنبه این هفته
+        val todayValue = today.dayOfWeek.value
         val daysSinceSaturday = (todayValue + 1) % 7 
         val saturday = today.minusDays(daysSinceSaturday.toLong())
         
@@ -23,6 +20,50 @@ object PersianDate {
             weekDates.add(getPersianDateFromDate(saturday.plusDays(i.toLong())))
         }
         return weekDates
+    }
+
+    // گرفتن نام ماه جاری (مثلاً "آبان ۱۴۰۵")
+    fun getCurrentMonthYear(): String {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        val persian = getPersianDateFromDate(today) // "جمعه، ۲۹ آبان ۱۴۰۵"
+        return persian.substringAfter("، ").substringAfter(" ") // "آبان ۱۴۰۵"
+    }
+
+    // ساخت جدول روزهای ماه برای تقویم
+    fun getCurrentMonthGrid(): List<Pair<Int, String>?> {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        val firstOfGregorian = today.withDayOfMonth(1).minusDays(7) 
+        val dates = mutableListOf<Pair<Int, String>>()
+        val targetMonthYear = getCurrentMonthYear()
+
+        for (i in 0..45) {
+            val date = firstOfGregorian.plusDays(i.toLong())
+            val persian = getPersianDateFromDate(date)
+            if (persian.endsWith(targetMonthYear)) {
+                val parts = persian.split("، ")
+                val dayNum = parts[1].split(" ")[0].toIntOrNull() ?: 0
+                dates.add(Pair(dayNum, persian))
+            }
+        }
+
+        if (dates.isEmpty()) return emptyList()
+
+        val firstDayName = dates.first().second.split("، ")[0]
+        val startOffset = when(firstDayName) {
+            "شنبه" -> 0
+            "یکشنبه" -> 1
+            "دوشنبه" -> 2
+            "سه‌شنبه" -> 3
+            "چهارشنبه" -> 4
+            "پنجشنبه" -> 5
+            "جمعه" -> 6
+            else -> 0
+        }
+
+        val grid = mutableListOf<Pair<Int, String>?>()
+        for (i in 0 until startOffset) grid.add(null)
+        grid.addAll(dates)
+        return grid
     }
 
     private fun getPersianDateFromDate(date: LocalDate): String {
