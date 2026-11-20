@@ -8,7 +8,6 @@ import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.LazyRow
 import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
@@ -71,7 +70,6 @@ fun MainScreen() {
     var selectedWeekDay by remember { mutableStateOf(weekDaysList[0]) }
     var selectedMonthDay by remember { mutableStateOf(PersianDate.getDayOfMonthNumber()) }
     
-    // وضعیت‌های مربوط به مجموعه‌نگار
     val defaultCategories = listOf("کتاب‌ها", "فیلم‌ها", "فهرست خرید", "لوازم سفر", "مخاطبین", "یادداشت‌های آزاد")
     var selectedCategory by remember { mutableStateOf(defaultCategories[0]) }
     val allCategories = (defaultCategories + collections.map { it.category }).distinct()
@@ -90,7 +88,6 @@ fun MainScreen() {
     
     val scope = rememberCoroutineScope()
 
-    // باز کردن پنجره برای ویرایش
     val handleEditTask: (TaskEntity) -> Unit = { task ->
         taskToEdit = task
         newTaskTitle = task.title
@@ -125,6 +122,8 @@ fun MainScreen() {
                     newTaskDateString = ""
                     newTaskReminderDays = "0"
                     newCategoryName = ""
+                    // اگر هیچ مجموعه‌ای باز نبود، پیش‌فرض اولین مجموعه انتخاب شود
+                    if (selectedCategory.isEmpty()) selectedCategory = defaultCategories[0]
                     showDialog = true 
                 },
                 containerColor = Gold,
@@ -414,58 +413,76 @@ fun CollectionScreen(
     onEditItem: (CollectionItemEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    val filteredItems = collections.filter { it.category == selectedCategory }
-
-    Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
-        // نوار افقی دسته‌بندی‌ها
-        LazyRow(
-            modifier = Modifier.fillMaxWidth().padding(8.dp),
-            horizontalArrangement = Arrangement.spacedBy(8.dp)
-        ) {
-            items(allCategories) { category ->
-                FilterChip(
-                    selected = selectedCategory == category,
-                    onClick = { onCategorySelected(category) },
-                    label = { Text(category, fontSize = 12.sp) },
-                    colors = FilterChipDefaults.filterChipColors(
-                        selectedContainerColor = DarkEmerald,
-                        selectedLabelColor = Color.White
-                    )
-                )
-            }
-        }
-
-        // لیست آیتم‌ها
-        if (filteredItems.isEmpty()) {
-            Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
-                Text("این مجموعه خالی است.", color = Color.Gray)
-            }
-        } else {
-            LazyColumn(
-                modifier = Modifier.fillMaxSize(),
-                contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 4.dp, bottom = 80.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp)
+    
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(paddingValues),
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp),
+        verticalArrangement = Arrangement.spacedBy(8.dp)
+    ) {
+        items(allCategories) { category ->
+            val isExpanded = selectedCategory == category
+            Card(
+                modifier = Modifier.fillMaxWidth(),
+                colors = CardDefaults.cardColors(
+                    containerColor = if (isExpanded) DarkEmerald else Color.White
+                ),
+                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                shape = RoundedCornerShape(8.dp)
             ) {
-                items(filteredItems) { item ->
-                    Card(
+                Column(
+                    modifier = Modifier
+                        .clickable { 
+                            // اگر روی خودش کلیک شد، جمع شود. اگر روی دیگری، باز شود
+                            onCategorySelected(if (isExpanded) "" else category) 
+                        }
+                        .padding(12.dp)
+                ) {
+                    Row(
                         modifier = Modifier.fillMaxWidth(),
-                        colors = CardDefaults.cardColors(containerColor = Color.White),
-                        elevation = CardDefaults.cardElevation(1.dp),
-                        shape = RoundedCornerShape(6.dp)
+                        horizontalArrangement = Arrangement.SpaceBetween,
+                        verticalAlignment = Alignment.CenterVertically
                     ) {
-                        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
-                            Text(
-                                text = item.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
-                                color = if (item.isCompleted) Color.Gray else Color.Black,
-                                textDecoration = if (item.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
-                                modifier = Modifier.weight(1f)
-                            )
-                            if (item.description.isNotEmpty()) {
-                                Text(item.description, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
+                        Text(
+                            text = category,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold,
+                            color = if (isExpanded) Color.White else DarkEmerald
+                        )
+                        Icon(
+                            imageVector = if (isExpanded) Icons.Default.KeyboardArrowUp else Icons.Default.KeyboardArrowDown,
+                            contentDescription = null,
+                            tint = if (isExpanded) Color.White else DarkEmerald
+                        )
+                    }
+                    
+                    if (isExpanded) {
+                        Spacer(modifier = Modifier.height(8.dp))
+                        val filteredItems = collections.filter { it.category == category }
+                        if (filteredItems.isEmpty()) {
+                            Text("این مجموعه خالی است.", color = Color.LightGray, fontSize = 12.sp)
+                        } else {
+                            filteredItems.forEach { item ->
+                                Card(
+                                    modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp),
+                                    colors = CardDefaults.cardColors(containerColor = Color.White),
+                                    shape = RoundedCornerShape(6.dp)
+                                ) {
+                                    Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+                                        Text(
+                                            text = item.title, fontSize = 14.sp, fontWeight = FontWeight.Medium,
+                                            color = if (item.isCompleted) Color.Gray else Color.Black,
+                                            textDecoration = if (item.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                            modifier = Modifier.weight(1f)
+                                        )
+                                        if (item.description.isNotEmpty()) {
+                                            Text(item.description, fontSize = 11.sp, color = Color.Gray, modifier = Modifier.padding(horizontal = 4.dp))
+                                        }
+                                        IconButton(onClick = { onEditItem(item) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
+                                        IconButton(onClick = { scope.launch { collectionDao.updateItem(item.copy(isCompleted = !item.isCompleted)) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (item.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
+                                        IconButton(onClick = { scope.launch { collectionDao.deleteItem(item) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
+                                    }
+                                }
                             }
-                            IconButton(onClick = { onEditItem(item) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
-                            IconButton(onClick = { scope.launch { collectionDao.updateItem(item.copy(isCompleted = !item.isCompleted)) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (item.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
-                            IconButton(onClick = { scope.launch { collectionDao.deleteItem(item) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
                         }
                     }
                 }
