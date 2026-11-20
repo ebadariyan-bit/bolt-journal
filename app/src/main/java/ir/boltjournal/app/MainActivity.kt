@@ -9,6 +9,8 @@ import androidx.compose.foundation.lazy.items
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
+import androidx.compose.material.icons.filled.Check
+import androidx.compose.material.icons.filled.Delete
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
@@ -17,6 +19,7 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
@@ -118,7 +121,6 @@ fun MainScreen() {
                         )
                         Spacer(modifier = Modifier.height(4.dp))
                         Text(
-                            // اصلاح نهایی نام تابع
                             text = PersianDate.getCurrentPersianDate(),
                             color = Color.White,
                             fontSize = 20.sp,
@@ -156,7 +158,39 @@ fun MainScreen() {
                                     horizontalArrangement = Arrangement.SpaceBetween,
                                     verticalAlignment = Alignment.CenterVertically
                                 ) {
-                                    Text(text = task.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = DarkEmerald)
+                                    Text(
+                                        text = task.title,
+                                        fontSize = 16.sp,
+                                        fontWeight = FontWeight.Medium,
+                                        color = if (task.isCompleted) Color.Gray else DarkEmerald,
+                                        textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
+                                        modifier = Modifier.weight(1f)
+                                    )
+                                    
+                                    Row {
+                                        IconButton(onClick = {
+                                            scope.launch {
+                                                taskDao.updateTask(task.copy(isCompleted = !task.isCompleted))
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Check,
+                                                contentDescription = "انجام شد",
+                                                tint = if (task.isCompleted) Color.Green else Color.LightGray
+                                            )
+                                        }
+                                        IconButton(onClick = {
+                                            scope.launch {
+                                                taskDao.deleteTask(task)
+                                            }
+                                        }) {
+                                            Icon(
+                                                imageVector = Icons.Default.Delete,
+                                                contentDescription = "حذف",
+                                                tint = Color.Red.copy(alpha = 0.7f)
+                                            )
+                                        }
+                                    }
                                 }
                             }
                         }
