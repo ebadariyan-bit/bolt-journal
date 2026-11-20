@@ -69,18 +69,15 @@ fun MainScreen() {
 
     var showDialog by remember { mutableStateOf(false) }
     
-    // متغیرهای فرم
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskPriority by remember { mutableStateOf("GRAY") }
     var newTaskDateString by remember { mutableStateOf("") }
     var newTaskReminderDays by remember { mutableStateOf("0") }
     
-    // متغیر برای تشخیص حالت ویرایش
     var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
     
     val scope = rememberCoroutineScope()
 
-    // تابعی برای باز کردن پنجره ویرایش
     val handleEditTask: (TaskEntity) -> Unit = { task ->
         taskToEdit = task
         newTaskTitle = task.title
@@ -100,7 +97,7 @@ fun MainScreen() {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
-                    taskToEdit = null // حالت افزودن جدید
+                    taskToEdit = null 
                     newTaskTitle = ""
                     newTaskPriority = "GRAY"
                     newTaskDateString = ""
@@ -148,7 +145,6 @@ fun MainScreen() {
                     OutlinedTextField(value = newTaskTitle, onValueChange = { newTaskTitle = it }, label = { Text("عنوان کار") }, singleLine = true)
                     Spacer(modifier = Modifier.height(12.dp))
                     
-                    // نمایش رنگ‌ها فقط در صفحه روزنگار
                     if (selectedItem == 0) {
                         Text("اولویت (آیزنهاور):", fontSize = 12.sp, color = Color.Gray)
                         Row(horizontalArrangement = Arrangement.spacedBy(8.dp), modifier = Modifier.padding(vertical = 4.dp)) {
@@ -157,13 +153,11 @@ fun MainScreen() {
                             }
                         }
                     } 
-                    // راهنمای تکرار خودکار در هفته و ماه (فقط در حالت افزودن نشان داده می‌شود)
                     else if (selectedItem == 1 && taskToEdit == null) {
                         Text("این کار به صورت خودکار هر هفته در روز «$selectedWeekDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
                     } else if (selectedItem == 2 && taskToEdit == null) {
                         Text("این کار به صورت خودکار هر ماه در روز «$selectedMonthDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
                     } 
-                    // تنظیمات مخصوص آینده‌نگار
                     else if (selectedItem == 3) {
                         OutlinedTextField(value = newTaskDateString, onValueChange = { newTaskDateString = it }, label = { Text("تاریخ آینده (مثلا 1405/12/25)") }, singleLine = true)
                         Spacer(modifier = Modifier.height(8.dp))
@@ -176,7 +170,6 @@ fun MainScreen() {
                     if (newTaskTitle.isNotBlank()) {
                         scope.launch {
                             if (taskToEdit == null) {
-                                // حالت افزودن
                                 val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
                                 val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
                                 
@@ -189,7 +182,6 @@ fun MainScreen() {
                                     reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
                                 ))
                             } else {
-                                // حالت ویرایش
                                 taskDao.updateTask(taskToEdit!!.copy(
                                     title = newTaskTitle,
                                     priority = newTaskPriority,
@@ -249,7 +241,16 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
             item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("هیچ کاری ثبت نشده است.", color = Color.Gray) } }
         } else {
             items(sortedTasks) { task ->
-                CompactTaskItem(task, taskDao, scope, showPriority = true, onEdit = { onEditTask(task) })
+                CompactTaskItem(
+                    task = task, 
+                    taskDao = taskDao, 
+                    scope = scope, 
+                    showPriority = true, 
+                    onEdit = { onEditTask(task) },
+                    onPriorityChange = { newColor -> 
+                        scope.launch { taskDao.updateTask(task.copy(priority = newColor)) }
+                    }
+                )
             }
         }
     }
@@ -408,7 +409,14 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
 }
 
 @Composable
-fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, showPriority: Boolean, onEdit: () -> Unit) {
+fun CompactTaskItem(
+    task: TaskEntity, 
+    taskDao: TaskDao, 
+    scope: kotlinx.coroutines.CoroutineScope, 
+    showPriority: Boolean, 
+    onEdit: () -> Unit,
+    onPriorityChange: (String) -> Unit = {} // قابلیت تغییر رنگ با کلیک
+) {
     val color = when(task.priority) {
         "RED" -> EisenhowerRed
         "GREEN" -> EisenhowerGreen
@@ -424,26 +432,41 @@ fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutine
     ) {
         Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (showPriority) {
-                Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
+                // نقطه رنگی قابل کلیک برای تغییر سریع اولویت
+                Box(
+                    modifier = Modifier
+                        .size(18.dp)
+                        .clip(CircleShape)
+                        .clickable { 
+                            val nextColor = when(task.priority) {
+                                "RED" -> "GREEN"
+                                "GREEN" -> "ORANGE"
+                                "ORANGE" -> "GRAY"
+                                else -> "RED"
+                            }
+                            onPriorityChange(nextColor) 
+                        },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Box(modifier = Modifier.size(10.dp).background(color, CircleShape))
+                }
                 Spacer(modifier = Modifier.width(8.dp))
             }
+            
             Text(
                 text = task.title, fontSize = 14.sp, color = if (task.isCompleted) Color.Gray else Color.Black,
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                 modifier = Modifier.weight(1f)
             )
             
-            // دکمه ویرایش
             IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) 
             }
             
-            // دکمه انجام شد
             IconButton(onClick = { scope.launch { taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) } }, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) 
             }
             
-            // دکمه حذف
             IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) 
             }
