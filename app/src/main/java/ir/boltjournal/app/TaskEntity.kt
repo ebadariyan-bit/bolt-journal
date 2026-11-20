@@ -9,7 +9,10 @@ data class TaskEntity(
     val title: String,
     val description: String = "",
     val date: Long = System.currentTimeMillis(),
-    val dateString: String = "", // تاریخ دقیق به شمسی برای گروه‌بندی
-    val time: String = "",
+    val dateString: String = "", // برای آینده‌نگار (مثلاً 1405/12/25)
+    val priority: String = "GRAY", // RED, GREEN, ORANGE, GRAY
+    val recurrenceType: String = "NONE", // NONE, WEEKLY, MONTHLY
+    val recurrenceValue: String = "", // مثلا "شنبه" یا "15"
+    val reminderDays: Int = 0, // چند روز قبل یادآوری شود
     val isCompleted: Boolean = false
 )
