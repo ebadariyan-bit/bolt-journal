@@ -171,8 +171,6 @@ fun MainScreen() {
     }
 }
 
-// ... (DailyLogScreen و کدهای آن بدون تغییر باقی می‌مانند) ...
-
 @Composable
 fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao, dailyNoteDao: DailyNoteDao) {
     val context = LocalContext.current
@@ -282,8 +280,6 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
         }
     }
 }
-
-// ... (WeeklyLogScreen و کدهای آن بدون تغییر باقی می‌مانند) ...
 
 @Composable
 fun WeeklyLogScreen(
@@ -447,9 +443,10 @@ fun MonthlyLogScreen(
                 }
             }
         } else {
-            items(dayTasks.size) { index ->
+            // اصلاح خطای سینتکسی اینجاست: پارامتر span باید به خود تابع items داده شود، نه به Modifier.padding
+            items(dayTasks.size, span = { GridItemSpan(7) }) { index ->
                 val task = dayTasks[index]
-                Box(modifier = Modifier.padding(span = { GridItemSpan(7) })) {
+                Box(modifier = Modifier.padding(bottom = 8.dp)) {
                     TaskItem(task, taskDao, scope)
                 }
             }
@@ -460,7 +457,7 @@ fun MonthlyLogScreen(
 @Composable
 fun TaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope) {
     Card(
-        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
+        modifier = Modifier.fillMaxWidth(),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(8.dp)
