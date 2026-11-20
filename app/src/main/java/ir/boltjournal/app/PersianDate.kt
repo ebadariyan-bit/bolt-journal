@@ -5,7 +5,7 @@ import java.time.ZoneId
 
 object PersianDate {
     fun getCurrentPersianDate(): String {
-        // گرفتن تاریخ دقیق تهران مستقل از تنظیمات گوشی
+        // خواندن تاریخ دقیق تهران
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val gYear = today.year
         val gMonth = today.monthValue
@@ -47,7 +47,7 @@ object PersianDate {
 
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
         val days = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
-        
+
         return "${days[today.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
     }
 }
