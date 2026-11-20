@@ -4,7 +4,7 @@ import java.time.LocalDate
 
 object PersianDate {
     fun getCurrentPersianDate(): String {
-        // خواندن تاریخ استاندارد میلادی مستقل از تنظیمات زبان گوشی
+        // خواندن تاریخ میلادی مستقل از تنظیمات گوشی
         val today = LocalDate.now()
         val gYear = today.year
         val gMonth = today.monthValue
@@ -47,7 +47,7 @@ object PersianDate {
 
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
         
-        // تبدیل دقیق روز هفته
+        // محاسبه دقیق روز هفته بر اساس میلادی
         val dayOfWeekValue = today.dayOfWeek.value
         val days = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
         val dayName = days[dayOfWeekValue]
