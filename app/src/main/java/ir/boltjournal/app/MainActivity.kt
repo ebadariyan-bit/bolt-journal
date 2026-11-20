@@ -3,29 +3,32 @@ package ir.boltjournal.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
-import androidx.compose.foundation.layout.Box
-import androidx.compose.foundation.layout.fillMaxSize
-import androidx.compose.foundation.layout.padding
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.lazy.LazyColumn
+import androidx.compose.foundation.lazy.items
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.Add
 import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
+import kotlinx.coroutines.launch
 
-// رنگ‌های اصلی برنامه
-val DarkEmerald = Color(0xFF1B5E20) // سبز یشمی تیره
-val Cream = Color(0xFFFDFBF7)       // کرم
-val Gold = Color(0xFFC5A059)        // طلایی ملایم
+val DarkEmerald = Color(0xFF1B5E20)
+val Cream = Color(0xFFFDFBF7)
+val Gold = Color(0xFFC5A059)
 
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
         setContent {
-            // اجبار برنامه به راست‌چین بودن
             CompositionLocalProvider(LocalLayoutDirection provides LayoutDirection.Rtl) {
                 BoltJournalTheme {
                     MainScreen()
@@ -40,16 +43,34 @@ class MainActivity : ComponentActivity() {
 fun MainScreen() {
     var selectedItem by remember { mutableIntStateOf(0) }
     val navItems = listOf("روزنگار", "هفته‌نگار", "ماه‌نگار", "آینده‌نگار", "مجموعه‌نگار")
-    val navIcons = listOf("📝", "📅", "🗓️", "🔭", "📚") // فعلاً از آیکون‌های ساده استفاده می‌کنیم
+    val navIcons = listOf("📝", "📅", "🗓️", "🔭", "📚")
+
+    val context = LocalContext.current
+    val db = remember { AppDatabase.getDatabase(context) }
+    val taskDao = db.taskDao()
+    val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
+
+    var showDialog by remember { mutableStateOf(false) }
+    var newTaskTitle by remember { mutableStateOf("") }
+    val scope = rememberCoroutineScope()
 
     Scaffold(
         topBar = {
             TopAppBar(
-                title = { 
-                    Text("بولت ژورنال", color = Color.White, fontWeight = FontWeight.Bold) 
-                },
+                title = { Text("بولت ژورنال", color = Color.White, fontWeight = FontWeight.Bold) },
                 colors = TopAppBarDefaults.topAppBarColors(containerColor = DarkEmerald)
             )
+        },
+        floatingActionButton = {
+            if (selectedItem == 0) {
+                FloatingActionButton(
+                    onClick = { showDialog = true },
+                    containerColor = Gold,
+                    contentColor = Color.White
+                ) {
+                    Icon(Icons.Default.Add, contentDescription = "افزودن کار جدید")
+                }
+            }
         },
         bottomBar = {
             NavigationBar(containerColor = Cream) {
@@ -71,19 +92,83 @@ fun MainScreen() {
         }
     ) { paddingValues ->
         Box(
-            modifier = Modifier
-                .fillMaxSize()
-                .padding(paddingValues),
+            modifier = Modifier.fillMaxSize().padding(paddingValues),
             contentAlignment = Alignment.Center
         ) {
-            // این متن فعلاً نمایش داده می‌شود تا وقتی صفحات واقعی ساخته شوند
-            Text(
-                text = "صفحه ${navItems[selectedItem]} به زودی ساخته می‌شود...",
-                fontSize = 18.sp,
-                color = DarkEmerald,
-                fontWeight = FontWeight.Medium
-            )
+            if (selectedItem == 0) {
+                if (tasks.isEmpty()) {
+                    Text(
+                        text = "امروز هیچ کاری ثبت نشده است.\nبرای افزودن، روی دکمه + بزنید.",
+                        fontSize = 16.sp,
+                        color = Color.Gray,
+                        textAlign = androidx.compose.ui.text.style.TextAlign.Center
+                    )
+                } else {
+                    LazyColumn(
+                        modifier = Modifier.fillMaxSize().padding(16.dp),
+                        verticalArrangement = Arrangement.spacedBy(8.dp)
+                    ) {
+                        items(tasks) { task ->
+                            Card(
+                                modifier = Modifier.fillMaxWidth(),
+                                colors = CardDefaults.cardColors(containerColor = Color.White),
+                                elevation = CardDefaults.cardElevation(defaultElevation = 2.dp)
+                            ) {
+                                Row(
+                                    modifier = Modifier.padding(16.dp).fillMaxWidth(),
+                                    horizontalArrangement = Arrangement.SpaceBetween,
+                                    verticalAlignment = Alignment.CenterVertically
+                                ) {
+                                    Text(text = task.title, fontSize = 16.sp, fontWeight = FontWeight.Medium, color = DarkEmerald)
+                                }
+                            }
+                        }
+                    }
+                }
+            } else {
+                Text(
+                    text = "صفحه ${navItems[selectedItem]} به زودی...",
+                    fontSize = 18.sp,
+                    color = DarkEmerald,
+                    fontWeight = FontWeight.Medium
+                )
+            }
         }
+    }
+
+    if (showDialog) {
+        AlertDialog(
+            onDismissRequest = { showDialog = false },
+            title = { Text("افزودن کار جدید", fontWeight = FontWeight.Bold, color = DarkEmerald) },
+            text = {
+                OutlinedTextField(
+                    value = newTaskTitle,
+                    onValueChange = { newTaskTitle = it },
+                    label = { Text("عنوان کار") },
+                    singleLine = true
+                )
+            },
+            confirmButton = {
+                TextButton(
+                    onClick = {
+                        if (newTaskTitle.isNotBlank()) {
+                            scope.launch {
+                                taskDao.insertTask(TaskEntity(title = newTaskTitle))
+                                newTaskTitle = ""
+                                showDialog = false
+                            }
+                        }
+                    }
+                ) {
+                    Text("ذخیره", color = DarkEmerald)
+                }
+            },
+            dismissButton = {
+                TextButton(onClick = { showDialog = false }) {
+                    Text("لغو", color = Color.Gray)
+                }
+            }
+        )
     }
 }
 
