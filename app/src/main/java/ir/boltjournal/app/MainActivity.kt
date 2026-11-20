@@ -90,6 +90,7 @@ fun MainScreen() {
                     taskTargetDate = when(selectedItem) {
                         1 -> PersianDate.getCurrentWeekDates()[selectedWeekDayIndex]
                         2 -> selectedMonthDate
+                        3 -> PersianDate.getCurrentPersianDate() // برای آینده‌نگار هم فعلا تاریخ امروز را می‌گیریم
                         else -> PersianDate.getCurrentPersianDate()
                     }
                     showDialog = true 
@@ -123,6 +124,7 @@ fun MainScreen() {
             0 -> DailyLogScreen(paddingValues, tasks, taskDao, dailyNoteDao)
             1 -> WeeklyLogScreen(paddingValues, tasks, taskDao, selectedWeekDayIndex) { selectedWeekDayIndex = it }
             2 -> MonthlyLogScreen(paddingValues, tasks, taskDao, selectedMonthDate) { selectedMonthDate = it }
+            3 -> FutureLogScreen(paddingValues, tasks, taskDao)
             else -> {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     Text("صفحه ${navItems[selectedItem]} به زودی...", fontSize = 18.sp, color = DarkEmerald, fontWeight = FontWeight.Medium)
@@ -152,7 +154,11 @@ fun MainScreen() {
                     onClick = {
                         if (newTaskTitle.isNotBlank()) {
                             scope.launch {
-                                taskDao.insertTask(TaskEntity(title = newTaskTitle, date = taskTargetDate.hashCode().toLong()))
+                                taskDao.insertTask(TaskEntity(
+                                    title = newTaskTitle, 
+                                    date = taskTargetDate.hashCode().toLong(),
+                                    dateString = taskTargetDate
+                                ))
                                 newTaskTitle = ""
                                 showDialog = false
                             }
@@ -443,7 +449,6 @@ fun MonthlyLogScreen(
                 }
             }
         } else {
-            // اصلاح خطای سینتکسی اینجاست: پارامتر span باید به خود تابع items داده شود، نه به Modifier.padding
             items(dayTasks.size, span = { GridItemSpan(7) }) { index ->
                 val task = dayTasks[index]
                 Box(modifier = Modifier.padding(bottom = 8.dp)) {
@@ -455,9 +460,62 @@ fun MonthlyLogScreen(
 }
 
 @Composable
+fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao) {
+    val scope = rememberCoroutineScope()
+    val todayDate = PersianDate.getCurrentPersianDate()
+    
+    // فیلتر کردن کارهایی که تاریخشان با امروز متفاوت است
+    val futureTasks = tasks.filter { it.dateString.isNotEmpty() && it.dateString != todayDate }
+
+    LazyColumn(
+        modifier = Modifier.fillMaxSize().padding(paddingValues).padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(12.dp)
+    ) {
+        item {
+            Text(
+                text = "برنامه‌های آینده",
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkEmerald,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
+        if (futureTasks.isEmpty()) {
+            item {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text("هیچ برنامه‌ای برای آینده ثبت نشده است.", color = Color.Gray)
+                }
+            }
+        } else {
+            // گروه‌بندی بر اساس روز (تاریخ شمسی)
+            val groupedTasks = futureTasks.groupBy { it.dateString }
+            
+            groupedTasks.forEach { (date, tasksForDate) ->
+                item {
+                    Card(
+                        modifier = Modifier.fillMaxWidth(),
+                        colors = CardDefaults.cardColors(containerColor = Cream),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(12.dp)) {
+                            Text(date, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
+                            Spacer(modifier = Modifier.height(8.dp))
+                            tasksForDate.forEach { task ->
+                                TaskItem(task, taskDao, scope)
+                            }
+                        }
+                    }
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun TaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(8.dp)
