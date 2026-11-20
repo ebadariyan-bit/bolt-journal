@@ -1,20 +1,20 @@
 package ir.boltjournal.app
 
 import java.time.LocalDate
+import java.time.ZoneId
 
 object PersianDate {
     fun getCurrentPersianDate(): String {
-        // خواندن تاریخ میلادی مستقل از تنظیمات گوشی
-        val today = LocalDate.now()
+        // گرفتن تاریخ دقیق تهران مستقل از تنظیمات گوشی
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val gYear = today.year
         val gMonth = today.monthValue
         val gDay = today.dayOfMonth
 
         val g_d_m = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
-        var jy: Int
-        var gy = gYear - 1600
-        var gm = gMonth - 1
-        var gd = gDay - 1
+        val gy = gYear - 1600
+        val gm = gMonth - 1
+        val gd = gDay - 1
 
         var g_day_no = 365 * gy + (gy + 3) / 4 - (gy + 99) / 100 + (gy + 399) / 400
         for (i in 0 until gm) g_day_no += g_d_m[i]
@@ -28,7 +28,7 @@ object PersianDate {
         val j_np = j_day_no / 12053
         j_day_no %= 12053
 
-        jy = 979 + 33 * j_np + 4 * (j_day_no / 1461)
+        var jy = 979 + 33 * j_np + 4 * (j_day_no / 1461)
         j_day_no %= 1461
 
         if (j_day_no >= 366) {
@@ -46,11 +46,8 @@ object PersianDate {
         val jd = j_day_no + 1
 
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
-        
-        val dayOfWeekValue = today.dayOfWeek.value
         val days = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
-        val dayName = days[dayOfWeekValue]
-
-        return "$dayName، $jd ${months[jm - 1]} $jy"
+        
+        return "${days[today.dayOfWeek.value]}، $jd ${months[jm - 1]} $jy"
     }
 }
