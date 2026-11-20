@@ -98,7 +98,6 @@ fun MainScreen() {
                 .padding(paddingValues)
         ) {
             if (selectedItem == 0) {
-                // کارت نمایش تاریخ شمسی
                 Card(
                     modifier = Modifier
                         .fillMaxWidth()
@@ -124,10 +123,16 @@ fun MainScreen() {
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
+                        // این خط برای تست اضافه شده تا تاریخ میلادی گوشی را ببینیم
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "میلادی گوشی: ${java.time.LocalDate.now()}",
+                            color = Color.LightGray,
+                            fontSize = 12.sp
+                        )
                     }
                 }
 
-                // لیست کارها
                 if (tasks.isEmpty()) {
                     Box(
                         modifier = Modifier.fillMaxSize(),
