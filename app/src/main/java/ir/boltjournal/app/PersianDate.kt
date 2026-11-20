@@ -1,14 +1,14 @@
 package ir.boltjournal.app
 
-import java.util.Calendar
-import java.util.GregorianCalendar
+import java.time.LocalDate
 
 object PersianDate {
     fun getCurrentPersianDate(): String {
-        val g = GregorianCalendar()
-        val gYear = g.get(Calendar.YEAR)
-        val gMonth = g.get(Calendar.MONTH) + 1
-        val gDay = g.get(Calendar.DAY_OF_MONTH)
+        // خواندن تاریخ استاندارد میلادی مستقل از تنظیمات زبان گوشی
+        val today = LocalDate.now()
+        val gYear = today.year
+        val gMonth = today.monthValue
+        val gDay = today.dayOfMonth
 
         val g_d_m = intArrayOf(0, 31, 59, 90, 120, 151, 181, 212, 243, 273, 304, 334)
         var jy: Int
@@ -46,9 +46,12 @@ object PersianDate {
         val jd = j_day_no + 1
 
         val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
-        val days = arrayOf("یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه")
-        val dayOfWeek = g.get(Calendar.DAY_OF_WEEK)
+        
+        // تبدیل دقیق روز هفته
+        val dayOfWeekValue = today.dayOfWeek.value
+        val days = arrayOf("", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه", "شنبه", "یکشنبه")
+        val dayName = days[dayOfWeekValue]
 
-        return "${days[dayOfWeek - 1]}، $jd ${months[jm - 1]} $jy"
+        return "$dayName، $jd ${months[jm - 1]} $jy"
     }
 }
