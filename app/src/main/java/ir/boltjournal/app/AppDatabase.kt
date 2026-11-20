@@ -5,9 +5,10 @@ import androidx.room.Database
 import androidx.room.Room
 import androidx.room.RoomDatabase
 
-@Database(entities = [TaskEntity::class], version = 1, exportSchema = false)
+@Database(entities = [TaskEntity::class, DailyNoteEntity::class], version = 2, exportSchema = false)
 abstract class AppDatabase : RoomDatabase() {
     abstract fun taskDao(): TaskDao
+    abstract fun dailyNoteDao(): DailyNoteDao
 
     companion object {
         @Volatile
@@ -19,7 +20,8 @@ abstract class AppDatabase : RoomDatabase() {
                     context.applicationContext,
                     AppDatabase::class.java,
                     "bolt_journal_database"
-                ).build()
+                ).fallbackToDestructiveMigration() // برای جلوگیری از کرش هنگام آپدیت دیتابیس
+                .build()
                 INSTANCE = instance
                 instance
             }
