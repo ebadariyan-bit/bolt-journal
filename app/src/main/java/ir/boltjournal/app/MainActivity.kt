@@ -24,6 +24,7 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import java.time.LocalDate
 
 val DarkEmerald = Color(0xFF1B5E20)
 val Cream = Color(0xFFFDFBF7)
@@ -125,6 +126,13 @@ fun MainScreen() {
                             color = Color.White,
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
+                        )
+                        // متن تستی: تاریخ میلادی که برنامه می‌خواند را نشان می‌دهد
+                        Spacer(modifier = Modifier.height(8.dp))
+                        Text(
+                            text = "تاریخ سیستم: ${LocalDate.now()}",
+                            color = Color.LightGray,
+                            fontSize = 12.sp
                         )
                     }
                 }
