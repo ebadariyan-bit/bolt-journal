@@ -64,6 +64,10 @@ fun MainScreen() {
     var showDialog by remember { mutableStateOf(false) }
     var newTaskTitle by remember { mutableStateOf("") }
     var taskTargetDate by remember { mutableStateOf(PersianDate.getCurrentPersianDate()) }
+    
+    // این متغیر جدید باعث می‌شود دکمه + بداند کدام روز هفته انتخاب شده است
+    var selectedWeekDayIndex by remember { mutableIntStateOf(0) }
+    
     val scope = rememberCoroutineScope()
 
     Scaffold(
@@ -76,7 +80,12 @@ fun MainScreen() {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
-                    taskTargetDate = if (selectedItem == 1) PersianDate.getCurrentWeekDates().first() else PersianDate.getCurrentPersianDate()
+                    // اگر در هفته‌نگار بودیم، تاریخِ روزِ انتخاب‌شده را می‌گیرد، وگرنه تاریخ امروز را
+                    taskTargetDate = if (selectedItem == 1) {
+                        PersianDate.getCurrentWeekDates()[selectedWeekDayIndex]
+                    } else {
+                        PersianDate.getCurrentPersianDate()
+                    }
                     showDialog = true 
                 },
                 containerColor = Gold,
@@ -106,7 +115,13 @@ fun MainScreen() {
     ) { paddingValues ->
         when (selectedItem) {
             0 -> DailyLogScreen(paddingValues, tasks, taskDao, dailyNoteDao)
-            1 -> WeeklyLogScreen(paddingValues, tasks, taskDao)
+            1 -> WeeklyLogScreen(
+                paddingValues = paddingValues, 
+                tasks = tasks, 
+                taskDao = taskDao, 
+                selectedDayIndex = selectedWeekDayIndex,
+                onDaySelected = { selectedWeekDayIndex = it }
+            )
             else -> {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     Text("صفحه ${navItems[selectedItem]} به زودی...", fontSize = 18.sp, color = DarkEmerald, fontWeight = FontWeight.Medium)
@@ -266,9 +281,14 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
 }
 
 @Composable
-fun WeeklyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao) {
+fun WeeklyLogScreen(
+    paddingValues: PaddingValues, 
+    tasks: List<TaskEntity>, 
+    taskDao: TaskDao,
+    selectedDayIndex: Int,
+    onDaySelected: (Int) -> Unit
+) {
     val weekDates = PersianDate.getCurrentWeekDates()
-    var selectedDayIndex by remember { mutableIntStateOf(0) }
     val scope = rememberCoroutineScope()
 
     Column(modifier = Modifier.fillMaxSize().padding(paddingValues)) {
@@ -285,7 +305,7 @@ fun WeeklyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     shape = RoundedCornerShape(8.dp),
-                    onClick = { selectedDayIndex = index }
+                    onClick = { onDaySelected(index) } // اینجا انتخاب را به بیرون اطلاع می‌دهد
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
