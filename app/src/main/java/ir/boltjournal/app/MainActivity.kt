@@ -63,18 +63,32 @@ fun MainScreen() {
     val taskDao = db.taskDao()
     val tasks by taskDao.getAllTasks().collectAsState(initial = emptyList())
 
-    // وضعیت‌های مربوط به انتخاب روز در هفته و ماه
     val weekDaysList = listOf("شنبه", "یکشنبه", "دوشنبه", "سه‌شنبه", "چهارشنبه", "پنجشنبه", "جمعه")
     var selectedWeekDay by remember { mutableStateOf(weekDaysList[0]) }
     var selectedMonthDay by remember { mutableStateOf(PersianDate.getDayOfMonthNumber()) }
 
     var showDialog by remember { mutableStateOf(false) }
+    
+    // متغیرهای فرم
     var newTaskTitle by remember { mutableStateOf("") }
     var newTaskPriority by remember { mutableStateOf("GRAY") }
     var newTaskDateString by remember { mutableStateOf("") }
     var newTaskReminderDays by remember { mutableStateOf("0") }
     
+    // متغیر برای تشخیص حالت ویرایش
+    var taskToEdit by remember { mutableStateOf<TaskEntity?>(null) }
+    
     val scope = rememberCoroutineScope()
+
+    // تابعی برای باز کردن پنجره ویرایش
+    val handleEditTask: (TaskEntity) -> Unit = { task ->
+        taskToEdit = task
+        newTaskTitle = task.title
+        newTaskPriority = task.priority
+        newTaskDateString = task.dateString
+        newTaskReminderDays = task.reminderDays.toString()
+        showDialog = true
+    }
 
     Scaffold(
         topBar = {
@@ -86,6 +100,7 @@ fun MainScreen() {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
+                    taskToEdit = null // حالت افزودن جدید
                     newTaskTitle = ""
                     newTaskPriority = "GRAY"
                     newTaskDateString = ""
@@ -114,10 +129,10 @@ fun MainScreen() {
         }
     ) { paddingValues ->
         when (selectedItem) {
-            0 -> DailyLogScreen(paddingValues, tasks, taskDao)
-            1 -> WeeklyLogScreen(paddingValues, tasks, taskDao, weekDaysList, selectedWeekDay) { selectedWeekDay = it }
-            2 -> MonthlyLogScreen(paddingValues, tasks, taskDao, selectedMonthDay) { selectedMonthDay = it }
-            3 -> FutureLogScreen(paddingValues, tasks, taskDao)
+            0 -> DailyLogScreen(paddingValues, tasks, taskDao, handleEditTask)
+            1 -> WeeklyLogScreen(paddingValues, tasks, taskDao, weekDaysList, selectedWeekDay, { selectedWeekDay = it }, handleEditTask)
+            2 -> MonthlyLogScreen(paddingValues, tasks, taskDao, selectedMonthDay, { selectedMonthDay = it }, handleEditTask)
+            3 -> FutureLogScreen(paddingValues, tasks, taskDao, handleEditTask)
             else -> Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                 Text("مجموعه‌نگار به زودی...", fontSize = 18.sp, color = DarkEmerald)
             }
@@ -127,7 +142,7 @@ fun MainScreen() {
     if (showDialog) {
         AlertDialog(
             onDismissRequest = { showDialog = false },
-            title = { Text("افزودن کار جدید", fontWeight = FontWeight.Bold, color = DarkEmerald) },
+            title = { Text(if (taskToEdit == null) "افزودن کار جدید" else "ویرایش کار", fontWeight = FontWeight.Bold, color = DarkEmerald) },
             text = {
                 Column(modifier = Modifier.heightIn(max = 500.dp)) {
                     OutlinedTextField(value = newTaskTitle, onValueChange = { newTaskTitle = it }, label = { Text("عنوان کار") }, singleLine = true)
@@ -142,17 +157,17 @@ fun MainScreen() {
                             }
                         }
                     } 
-                    // راهنمای تکرار خودکار در هفته و ماه
-                    else if (selectedItem == 1) {
+                    // راهنمای تکرار خودکار در هفته و ماه (فقط در حالت افزودن نشان داده می‌شود)
+                    else if (selectedItem == 1 && taskToEdit == null) {
                         Text("این کار به صورت خودکار هر هفته در روز «$selectedWeekDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
-                    } else if (selectedItem == 2) {
+                    } else if (selectedItem == 2 && taskToEdit == null) {
                         Text("این کار به صورت خودکار هر ماه در روز «$selectedMonthDay» تکرار می‌شود.", fontSize = 12.sp, color = DarkEmerald)
                     } 
                     // تنظیمات مخصوص آینده‌نگار
                     else if (selectedItem == 3) {
                         OutlinedTextField(value = newTaskDateString, onValueChange = { newTaskDateString = it }, label = { Text("تاریخ آینده (مثلا 1405/12/25)") }, singleLine = true)
                         Spacer(modifier = Modifier.height(8.dp))
-                        OutlinedTextField(value = newTaskReminderDays, onValueChange = { newTaskReminderDays = it }, label = { Text("یادآور چند روز قبل (0=بدون یادآور)") }, singleLine = true)
+                        OutlinedTextField(value = newTaskReminderDays, onValueChange = { newTaskReminderDays = it }, label = { Text("یادآور چند روز قبل (0=بدون)") }, singleLine = true)
                     }
                 }
             },
@@ -160,17 +175,28 @@ fun MainScreen() {
                 TextButton(onClick = {
                     if (newTaskTitle.isNotBlank()) {
                         scope.launch {
-                            val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
-                            val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
-                            
-                            taskDao.insertTask(TaskEntity(
-                                title = newTaskTitle, 
-                                priority = newTaskPriority,
-                                recurrenceType = recType,
-                                recurrenceValue = recValue,
-                                dateString = newTaskDateString,
-                                reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
-                            ))
+                            if (taskToEdit == null) {
+                                // حالت افزودن
+                                val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
+                                val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
+                                
+                                taskDao.insertTask(TaskEntity(
+                                    title = newTaskTitle, 
+                                    priority = newTaskPriority,
+                                    recurrenceType = recType,
+                                    recurrenceValue = recValue,
+                                    dateString = newTaskDateString,
+                                    reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
+                                ))
+                            } else {
+                                // حالت ویرایش
+                                taskDao.updateTask(taskToEdit!!.copy(
+                                    title = newTaskTitle,
+                                    priority = newTaskPriority,
+                                    dateString = newTaskDateString,
+                                    reminderDays = newTaskReminderDays.toIntOrNull() ?: 0
+                                ))
+                            }
                             showDialog = false
                         }
                     }
@@ -182,14 +208,13 @@ fun MainScreen() {
 }
 
 @Composable
-fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao) {
+fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao, onEditTask: (TaskEntity) -> Unit) {
     val scope = rememberCoroutineScope()
     val currentDate = PersianDate.getCurrentPersianDate()
     val todayDayOfWeek = PersianDate.getDayOfWeekName()
     val todayDayOfMonth = PersianDate.getDayOfMonthNumber()
     val occasion = PersianDate.getOccasion()
 
-    // فیلتر کردن کارهای امروز
     val todayTasks = tasks.filter {
         it.recurrenceType == "NONE" || 
         (it.recurrenceType == "WEEKLY" && it.recurrenceValue == todayDayOfWeek) ||
@@ -201,7 +226,7 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp), // فاصله از پایین برای دکمه +
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
         item {
@@ -224,7 +249,7 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
             item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("هیچ کاری ثبت نشده است.", color = Color.Gray) } }
         } else {
             items(sortedTasks) { task ->
-                CompactTaskItem(task, taskDao, scope, showPriority = true)
+                CompactTaskItem(task, taskDao, scope, showPriority = true, onEdit = { onEditTask(task) })
             }
         }
     }
@@ -237,7 +262,8 @@ fun WeeklyLogScreen(
     taskDao: TaskDao,
     weekDaysList: List<String>,
     selectedDay: String,
-    onDaySelected: (String) -> Unit
+    onDaySelected: (String) -> Unit,
+    onEditTask: (TaskEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
 
@@ -267,7 +293,9 @@ fun WeeklyLogScreen(
                         if (dayTasks.isEmpty()) {
                             Text("خالی", fontSize = 12.sp, color = Color.Gray, modifier = Modifier.padding(top = 4.dp))
                         } else {
-                            dayTasks.forEach { task -> CompactTaskItem(task, taskDao, scope, showPriority = false) }
+                            dayTasks.forEach { task -> 
+                                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) 
+                            }
                         }
                     }
                 }
@@ -282,7 +310,8 @@ fun MonthlyLogScreen(
     tasks: List<TaskEntity>, 
     taskDao: TaskDao,
     selectedDay: String,
-    onDaySelected: (String) -> Unit
+    onDaySelected: (String) -> Unit,
+    onEditTask: (TaskEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
     val monthGrid = remember { PersianDate.getCurrentMonthGrid() }
@@ -343,14 +372,14 @@ fun MonthlyLogScreen(
             item { Text("هیچ کاری ثبت نشده است.", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         } else {
             items(monthDayTasks) { task ->
-                CompactTaskItem(task, taskDao, scope, showPriority = false)
+                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) })
             }
         }
     }
 }
 
 @Composable
-fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao) {
+fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao, onEditTask: (TaskEntity) -> Unit) {
     val scope = rememberCoroutineScope()
     val futureTasks = tasks.filter { it.dateString.isNotEmpty() }.sortedBy { it.dateString }
 
@@ -368,7 +397,7 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                         Column(modifier = Modifier.padding(8.dp)) {
                             Text(date, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
                             dateTasks.forEach { task -> 
-                                CompactTaskItem(task, taskDao, scope, showPriority = false) 
+                                CompactTaskItem(task, taskDao, scope, showPriority = false, onEdit = { onEditTask(task) }) 
                             }
                         }
                     }
@@ -379,7 +408,7 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
 }
 
 @Composable
-fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, showPriority: Boolean) {
+fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, showPriority: Boolean, onEdit: () -> Unit) {
     val color = when(task.priority) {
         "RED" -> EisenhowerRed
         "GREEN" -> EisenhowerGreen
@@ -393,7 +422,7 @@ fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutine
         elevation = CardDefaults.cardElevation(defaultElevation = 1.dp),
         shape = RoundedCornerShape(6.dp)
     ) {
-        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 4.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
+        Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
             if (showPriority) {
                 Box(modifier = Modifier.size(8.dp).background(color, CircleShape))
                 Spacer(modifier = Modifier.width(8.dp))
@@ -403,10 +432,19 @@ fun CompactTaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutine
                 textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None,
                 modifier = Modifier.weight(1f)
             )
-            IconButton(onClick = { scope.launch { taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) } }, modifier = Modifier.size(28.dp)) { 
+            
+            // دکمه ویرایش
+            IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { 
+                Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) 
+            }
+            
+            // دکمه انجام شد
+            IconButton(onClick = { scope.launch { taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) } }, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) 
             }
-            IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(28.dp)) { 
+            
+            // دکمه حذف
+            IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) 
             }
         }
