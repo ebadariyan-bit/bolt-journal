@@ -16,13 +16,13 @@ object PersianDate {
     fun getDayOfMonthNumber(): String {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val persian = getPersianDateFromDate(today)
-        return persian.split("، ")[1].split(" ")[0] // استخراج عدد روز از رشته
+        return persian.split("، ")[1].split(" ")[0] 
     }
 
     fun getOccasion(): String {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val persian = getPersianDateFromDate(today)
-        val monthDay = persian.split("، ")[1] // مثلا "29 آبان"
+        val monthDay = persian.split("، ")[1] 
         
         return when {
             monthDay == "1 فروردین" -> "عید نوروز"
@@ -46,38 +46,55 @@ object PersianDate {
         return persian.substringAfter("، ").substringAfter(" ") 
     }
 
+    // الگوریتم جدید و دقیق برای پیدا کردن تمام روزهای ماه
     fun getCurrentMonthGrid(): List<Pair<Int, String>?> {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val firstOfGregorian = today.withDayOfMonth(1).minusDays(7) 
-        val dates = mutableListOf<Pair<Int, String>>()
         val targetMonthYear = getCurrentMonthYear()
+        val dates = mutableListOf<Pair<Int, String>>()
 
-        for (i in 0..45) {
-            val date = firstOfGregorian.plusDays(i.toLong())
+        // بررسی ۴۵ روز قبل تا ۴۵ روز بعد از امروز برای پیدا کردن تمام روزهای این ماه
+        for (i in -45..45) {
+            val date = today.plusDays(i.toLong())
             val persian = getPersianDateFromDate(date)
             if (persian.endsWith(targetMonthYear)) {
                 val dayNum = persian.split("، ")[1].split(" ")[0].toIntOrNull() ?: 0
-                dates.add(Pair(dayNum, persian))
+                // جلوگیری از تکراری بودن
+                if (!dates.any { it.first == dayNum }) {
+                    dates.add(Pair(dayNum, persian))
+                }
             }
         }
+        
+        // مرتب‌سازی بر اساس شماره روز (۱ تا ۳۱)
+        dates.sortBy { it.first }
 
         if (dates.isEmpty()) return emptyList()
 
+        // پیدا کردن روز شروع ماه (مثلا اگر ۱ ماه شنبه باشد، آفست ۰ است)
         val startOffset = when(dates.first().second.split("، ")[0]) {
-            "شنبه" -> 0; "یکشنبه" -> 1; "دوشنبه" -> 2; "سه‌شنبه" -> 3; "چهارشنبه" -> 4; "پنجشنبه" -> 5; "جمعه" -> 6; else -> 0
+            "شنبه" -> 0
+            "یکشنبه" -> 1
+            "دوشنبه" -> 2
+            "سه‌شنبه" -> 3
+            "چهارشنبه" -> 4
+            "پنجشنبه" -> 5
+            "جمعه" -> 6
+            else -> 0
         }
 
         val grid = mutableListOf<Pair<Int, String>?>()
+        // اضافه کردن خانه‌های خالی در ابتدا
         for (i in 0 until startOffset) grid.add(null)
+        
+        // اضافه کردن روزهای ماه
         grid.addAll(dates)
-        return grid
-    }
+        
+        // پر کردن انتهای جدول با خانه خالی تا تعداد خانه‌ها مضربی از ۷ شود (برای زیبایی گرید)
+        while (grid.size % 7 != 0) {
+            grid.add(null)
+        }
 
-    // محاسبه اختلاف روز بین دو تاریخ شمسی (برای یادآور)
-    fun getDaysDifference(targetDateString: String, currentDateString: String): Int {
-        // برای سادگی، فعلاً 0 برمی‌گردانیم تا در نسخه‌های بعدی دقیق شود
-        // (پیاده‌سازی دقیق تبدیل به میلادی نیاز به کتابخانه دارد، فعلاً از منطق ساده استفاده می‌کنیم)
-        return 0 
+        return grid
     }
 
     private fun getPersianDateFromDate(date: LocalDate): String {
