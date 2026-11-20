@@ -15,6 +15,7 @@ import androidx.compose.material3.*
 import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -24,7 +25,6 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
-import java.time.LocalDate
 
 val DarkEmerald = Color(0xFF1B5E20)
 val Cream = Color(0xFFFDFBF7)
@@ -127,15 +127,45 @@ fun MainScreen() {
                             fontSize = 20.sp,
                             fontWeight = FontWeight.Bold
                         )
-                        // متن تستی: تاریخ میلادی که برنامه می‌خواند را نشان می‌دهد
-                        Spacer(modifier = Modifier.height(8.dp))
-                        Text(
-                            text = "تاریخ سیستم: ${LocalDate.now()}",
-                            color = Color.LightGray,
-                            fontSize = 12.sp
-                        )
                     }
                 }
+
+                // --- بخش جدید: کارت جمع‌بندی و نوار پیشرفت ---
+                if (tasks.isNotEmpty()) {
+                    val totalTasks = tasks.size
+                    val completedTasks = tasks.count { it.isCompleted }
+                    val progress = completedTasks.toFloat() / totalTasks
+
+                    Card(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(horizontal = 16.dp, vertical = 4.dp),
+                        colors = CardDefaults.cardColors(containerColor = Color.White),
+                        elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
+                        shape = RoundedCornerShape(8.dp)
+                    ) {
+                        Column(modifier = Modifier.padding(16.dp)) {
+                            Row(
+                                modifier = Modifier.fillMaxWidth(),
+                                horizontalArrangement = Arrangement.SpaceBetween
+                            ) {
+                                Text("پیشرفت امروز", fontWeight = FontWeight.Bold, color = DarkEmerald)
+                                Text("$completedTasks از $totalTasks", color = Color.Gray, fontSize = 14.sp)
+                            }
+                            Spacer(modifier = Modifier.height(8.dp))
+                            LinearProgressIndicator(
+                                progress = { progress },
+                                modifier = Modifier
+                                    .fillMaxWidth()
+                                    .height(8.dp)
+                                    .clip(RoundedCornerShape(4.dp)),
+                                color = Gold,
+                                trackColor = Cream
+                            )
+                        }
+                    }
+                }
+                // ---------------------------------------------
 
                 if (tasks.isEmpty()) {
                     Box(
@@ -151,7 +181,7 @@ fun MainScreen() {
                     }
                 } else {
                     LazyColumn(
-                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp),
+                        modifier = Modifier.fillMaxSize().padding(horizontal = 16.dp, vertical = 8.dp),
                         verticalArrangement = Arrangement.spacedBy(8.dp)
                     ) {
                         items(tasks) { task ->
