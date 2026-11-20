@@ -38,6 +38,11 @@ val EisenhowerGreen = Color(0xFF43A047)
 val EisenhowerOrange = Color(0xFFFB8C00)
 val EisenhowerGray = Color(0xFF757575)
 
+// رنگ‌های هشدار
+val WarningBg = Color(0xFFFFF3E0)
+val WarningBorder = Color(0xFFFFB74D)
+val WarningText = Color(0xFFE65100)
+
 class MainActivity : ComponentActivity() {
     override fun onCreate(savedInstanceState: Bundle?) {
         super.onCreate(savedInstanceState)
@@ -122,7 +127,6 @@ fun MainScreen() {
                     newTaskDateString = ""
                     newTaskReminderDays = "0"
                     newCategoryName = ""
-                    // اگر هیچ مجموعه‌ای باز نبود، پیش‌فرض اولین مجموعه انتخاب شود
                     if (selectedCategory.isEmpty()) selectedCategory = defaultCategories[0]
                     showDialog = true 
                 },
@@ -265,6 +269,29 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
             }
         }
 
+        // هشدار روز ۲۹م ماه
+        if (todayDayOfMonth == "29") {
+            item {
+                Card(
+                    modifier = Modifier.fillMaxWidth(),
+                    colors = CardDefaults.cardColors(containerColor = WarningBg),
+                    border = androidx.compose.foundation.BorderStroke(1.dp, WarningBorder),
+                    shape = RoundedCornerShape(8.dp)
+                ) {
+                    Row(modifier = Modifier.padding(12.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Icon(Icons.Default.Warning, contentDescription = "هشدار", tint = WarningText)
+                        Spacer(modifier = Modifier.width(8.dp))
+                        Text(
+                            text = "یادآوری: امروز ۲۹م ماه است. اگر ماه جاری ۳۰ یا ۳۱ روزه است، حتماً اقدامات روزهای ۳۰ و ۳۱ را برنامه‌ریزی و بررسی کنید تا فراموش نشوند.",
+                            color = WarningText,
+                            fontSize = 12.sp,
+                            lineHeight = 16.sp
+                        )
+                    }
+                }
+            }
+        }
+
         if (sortedTasks.isEmpty()) {
             item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("هیچ کاری ثبت نشده است.", color = Color.Gray) } }
         } else {
@@ -323,18 +350,18 @@ fun MonthlyLogScreen(
 ) {
     val scope = rememberCoroutineScope()
     val monthGrid = remember { PersianDate.getCurrentMonthGrid() }
-    val monthYear = remember { PersianDate.getCurrentMonthYear() }
     val weekDays = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
-        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp)
+        contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 80.dp) // کمی فاصله از بالا
     ) {
         item {
-            Text(monthYear, fontSize = 18.sp, fontWeight = FontWeight.Bold, color = DarkEmerald, modifier = Modifier.fillMaxWidth().padding(vertical = 8.dp), textAlign = TextAlign.Center)
+            // نام ماه حذف شد و فقط ردیف روزهای هفته نمایش داده می‌شود
             Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
                 weekDays.forEach { Text(it, fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp) }
             }
+            Spacer(modifier = Modifier.height(8.dp))
         }
         item {
             Column {
@@ -432,7 +459,6 @@ fun CollectionScreen(
                 Column(
                     modifier = Modifier
                         .clickable { 
-                            // اگر روی خودش کلیک شد، جمع شود. اگر روی دیگری، باز شود
                             onCategorySelected(if (isExpanded) "" else category) 
                         }
                         .padding(12.dp)
