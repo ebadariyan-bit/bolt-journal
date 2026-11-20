@@ -4,10 +4,17 @@ import android.os.Bundle
 import android.widget.Toast
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.*
 import androidx.compose.foundation.lazy.LazyColumn
 import androidx.compose.foundation.lazy.LazyRow
+import androidx.compose.foundation.lazy.grid.GridCells
+import androidx.compose.foundation.lazy.grid.GridItemSpan
+import androidx.compose.foundation.lazy.grid.LazyVerticalGrid
 import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Add
@@ -65,8 +72,8 @@ fun MainScreen() {
     var newTaskTitle by remember { mutableStateOf("") }
     var taskTargetDate by remember { mutableStateOf(PersianDate.getCurrentPersianDate()) }
     
-    // این متغیر جدید باعث می‌شود دکمه + بداند کدام روز هفته انتخاب شده است
     var selectedWeekDayIndex by remember { mutableIntStateOf(0) }
+    var selectedMonthDate by remember { mutableStateOf(PersianDate.getCurrentPersianDate()) }
     
     val scope = rememberCoroutineScope()
 
@@ -80,11 +87,10 @@ fun MainScreen() {
         floatingActionButton = {
             FloatingActionButton(
                 onClick = { 
-                    // اگر در هفته‌نگار بودیم، تاریخِ روزِ انتخاب‌شده را می‌گیرد، وگرنه تاریخ امروز را
-                    taskTargetDate = if (selectedItem == 1) {
-                        PersianDate.getCurrentWeekDates()[selectedWeekDayIndex]
-                    } else {
-                        PersianDate.getCurrentPersianDate()
+                    taskTargetDate = when(selectedItem) {
+                        1 -> PersianDate.getCurrentWeekDates()[selectedWeekDayIndex]
+                        2 -> selectedMonthDate
+                        else -> PersianDate.getCurrentPersianDate()
                     }
                     showDialog = true 
                 },
@@ -115,13 +121,8 @@ fun MainScreen() {
     ) { paddingValues ->
         when (selectedItem) {
             0 -> DailyLogScreen(paddingValues, tasks, taskDao, dailyNoteDao)
-            1 -> WeeklyLogScreen(
-                paddingValues = paddingValues, 
-                tasks = tasks, 
-                taskDao = taskDao, 
-                selectedDayIndex = selectedWeekDayIndex,
-                onDaySelected = { selectedWeekDayIndex = it }
-            )
+            1 -> WeeklyLogScreen(paddingValues, tasks, taskDao, selectedWeekDayIndex) { selectedWeekDayIndex = it }
+            2 -> MonthlyLogScreen(paddingValues, tasks, taskDao, selectedMonthDate) { selectedMonthDate = it }
             else -> {
                 Box(modifier = Modifier.fillMaxSize().padding(paddingValues), contentAlignment = Alignment.Center) {
                     Text("صفحه ${navItems[selectedItem]} به زودی...", fontSize = 18.sp, color = DarkEmerald, fontWeight = FontWeight.Medium)
@@ -169,6 +170,8 @@ fun MainScreen() {
         )
     }
 }
+
+// ... (DailyLogScreen و کدهای آن بدون تغییر باقی می‌مانند) ...
 
 @Composable
 fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao, dailyNoteDao: DailyNoteDao) {
@@ -280,6 +283,8 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
     }
 }
 
+// ... (WeeklyLogScreen و کدهای آن بدون تغییر باقی می‌مانند) ...
+
 @Composable
 fun WeeklyLogScreen(
     paddingValues: PaddingValues, 
@@ -305,7 +310,7 @@ fun WeeklyLogScreen(
                     ),
                     elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
                     shape = RoundedCornerShape(8.dp),
-                    onClick = { onDaySelected(index) } // اینجا انتخاب را به بیرون اطلاع می‌دهد
+                    onClick = { onDaySelected(index) }
                 ) {
                     Box(modifier = Modifier.fillMaxSize(), contentAlignment = Alignment.Center) {
                         Text(
@@ -341,9 +346,121 @@ fun WeeklyLogScreen(
 }
 
 @Composable
+fun MonthlyLogScreen(
+    paddingValues: PaddingValues,
+    tasks: List<TaskEntity>,
+    taskDao: TaskDao,
+    selectedDate: String,
+    onDateSelected: (String) -> Unit
+) {
+    val monthGrid = remember { PersianDate.getCurrentMonthGrid() }
+    val monthYear = remember { PersianDate.getCurrentMonthYear() }
+    val weekDays = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+    val scope = rememberCoroutineScope()
+    
+    val dayTasks = tasks.filter { it.date == selectedDate.hashCode().toLong() }
+
+    LazyVerticalGrid(
+        columns = GridCells.Fixed(7),
+        modifier = Modifier.fillMaxSize().padding(paddingValues).padding(horizontal = 8.dp),
+        verticalArrangement = Arrangement.spacedBy(4.dp),
+        horizontalArrangement = Arrangement.spacedBy(4.dp)
+    ) {
+        item(span = { GridItemSpan(7) }) {
+            Text(
+                text = monthYear,
+                fontSize = 20.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkEmerald,
+                modifier = Modifier.fillMaxWidth().padding(vertical = 16.dp),
+                textAlign = TextAlign.Center
+            )
+        }
+
+        items(weekDays.size) { index ->
+            Text(
+                text = weekDays[index],
+                color = Color.Gray,
+                fontSize = 14.sp,
+                fontWeight = FontWeight.Bold,
+                textAlign = TextAlign.Center,
+                modifier = Modifier.padding(vertical = 8.dp)
+            )
+        }
+
+        items(monthGrid.size) { index ->
+            val dayInfo = monthGrid[index]
+            if (dayInfo == null) {
+                Box(modifier = Modifier.aspectRatio(1f))
+            } else {
+                val isSelected = dayInfo.second == selectedDate
+                val hasTasks = tasks.any { it.date == dayInfo.second.hashCode().toLong() }
+
+                Box(
+                    modifier = Modifier
+                        .aspectRatio(1f)
+                        .clip(CircleShape)
+                        .background(if (isSelected) DarkEmerald else Color.Transparent)
+                        .border(
+                            width = if (isSelected) 0.dp else 1.dp,
+                            color = if (isSelected) Color.Transparent else Color.LightGray.copy(alpha = 0.5f),
+                            shape = CircleShape
+                        )
+                        .clickable { onDateSelected(dayInfo.second) },
+                    contentAlignment = Alignment.Center
+                ) {
+                    Column(horizontalAlignment = Alignment.CenterHorizontally) {
+                        Text(
+                            text = dayInfo.first.toString(),
+                            color = if (isSelected) Color.White else Color.Black,
+                            fontSize = 16.sp,
+                            fontWeight = FontWeight.Bold
+                        )
+                        if (hasTasks) {
+                            Box(
+                                modifier = Modifier
+                                    .padding(top = 2.dp)
+                                    .size(6.dp)
+                                    .background(Gold, CircleShape)
+                            )
+                        }
+                    }
+                }
+            }
+        }
+
+        item(span = { GridItemSpan(7) }) {
+            Divider(modifier = Modifier.padding(vertical = 16.dp), color = Color.LightGray.copy(alpha = 0.5f))
+            Text(
+                text = "کارهای $selectedDate",
+                fontSize = 16.sp,
+                fontWeight = FontWeight.Bold,
+                color = DarkEmerald,
+                modifier = Modifier.padding(bottom = 8.dp)
+            )
+        }
+
+        if (dayTasks.isEmpty()) {
+            item(span = { GridItemSpan(7) }) {
+                Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) {
+                    Text("هیچ کاری برای این روز ثبت نشده است.", color = Color.Gray)
+                }
+            }
+        } else {
+            items(dayTasks.size) { index ->
+                val task = dayTasks[index]
+                Box(modifier = Modifier.padding(span = { GridItemSpan(7) })) {
+                    TaskItem(task, taskDao, scope)
+                }
+            }
+        }
+    }
+}
+
+@Composable
 fun TaskItem(task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope) {
     Card(
-        modifier = Modifier.fillMaxWidth(),
+        modifier = Modifier.fillMaxWidth().padding(bottom = 8.dp),
         colors = CardDefaults.cardColors(containerColor = Color.White),
         elevation = CardDefaults.cardElevation(defaultElevation = 2.dp),
         shape = RoundedCornerShape(8.dp)
