@@ -380,7 +380,6 @@ fun WeeklyLogScreen(
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 12.dp, bottom = 80.dp),
         verticalArrangement = Arrangement.spacedBy(8.dp)
     ) {
-        // ردیف‌های دو ستونی
         for (i in 0..2) {
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
@@ -389,14 +388,12 @@ fun WeeklyLogScreen(
                 }
             }
         }
-        // جمعه در مرکز
         item {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
                 DayGridCard("جمعه", selectedDay, onDaySelected, tasks, Modifier.fillMaxWidth(0.6f))
             }
         }
         
-        // خط جداکننده و لیست کارها در پایین
         item {
             Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray)
             Text("کارهای روز $selectedDay", fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
@@ -452,19 +449,14 @@ fun MonthlyLogScreen(
 ) {
     val scope = rememberCoroutineScope()
     val days = (1..31).map { it.toString() }
-    val weekDays = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
+    // حروف روزهای هفته حذف شدند
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 80.dp)
     ) {
         item {
-            Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
-                weekDays.forEach { Text(it, fontWeight = FontWeight.Bold, color = Color.Gray, fontSize = 12.sp) }
-            }
-            Spacer(modifier = Modifier.height(8.dp))
-        }
-        item {
+            // عنوان حذف شد و مستقیم به سراغ اعداد می‌رویم
             Column {
                 days.chunked(7).forEach { week ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
