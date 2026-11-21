@@ -432,8 +432,8 @@ fun DayGridCard(day: String, selectedDay: String, onDaySelected: (String) -> Uni
             if (dayTasks.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center) {
-                    val count = dayTasks.size.coerceAtMost(4)
-                    repeat(count) {
+                    // محدودیت حذف شد و به تعداد کل تسک‌ها دایره نمایش داده می‌شود
+                    repeat(dayTasks.size) {
                         Box(modifier = Modifier.padding(horizontal = 1.dp).size(6.dp).background(EisenhowerOrange, CircleShape))
                     }
                 }
@@ -449,14 +449,12 @@ fun MonthlyLogScreen(
 ) {
     val scope = rememberCoroutineScope()
     val days = (1..31).map { it.toString() }
-    // حروف روزهای هفته حذف شدند
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
         contentPadding = PaddingValues(start = 12.dp, end = 12.dp, top = 16.dp, bottom = 80.dp)
     ) {
         item {
-            // عنوان حذف شد و مستقیم به سراغ اعداد می‌رویم
             Column {
                 days.chunked(7).forEach { week ->
                     Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceAround) {
@@ -473,7 +471,8 @@ fun MonthlyLogScreen(
                                 Text(dayStr, color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
                                 if (taskCount > 0) {
                                     Row(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp), horizontalArrangement = Arrangement.Center) {
-                                        repeat(taskCount.coerceAtMost(4)) {
+                                        // محدودیت حذف شد و به تعداد کل تسک‌ها دایره نمایش داده می‌شود
+                                        repeat(taskCount) {
                                             Box(modifier = Modifier.padding(horizontal = 0.5.dp).size(4.dp).background(EisenhowerOrange, CircleShape))
                                         }
                                     }
