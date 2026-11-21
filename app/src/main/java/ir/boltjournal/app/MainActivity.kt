@@ -96,11 +96,11 @@ fun MainScreen() {
     val todayNumeric = PersianDate.getCurrentDateNumeric()
     val tomorrowNumeric = PersianDate.getTomorrowDateNumeric()
 
-    // اصلاحیه ۲: انتقال خودکار کارهای انجام نشده به روز بعد (موقع باز شدن برنامه)
+    // انتقال خودکار کارهای انجام نشده به روز بعد
     LaunchedEffect(Unit) {
         val unfinishedPastTasks = tasks.filter { 
             it.recurrenceType == "NONE" && !it.isCompleted && it.dateString.isNotEmpty() && 
-            it.dateString != "SKIPPED" && it.dateString < todayNumeric 
+            !it.dateString.startsWith("SKIPPED") && it.dateString != "NEXT_WEEK" && it.dateString < todayNumeric 
         }
         unfinishedPastTasks.forEach { task ->
             taskDao.updateTask(task.copy(dateString = todayNumeric))
@@ -143,7 +143,7 @@ fun MainScreen() {
                     newTaskTitle = ""
                     newTaskDesc = ""
                     newTaskPriority = "GRAY"
-                    newTaskDateString = if (selectedItem == 3) "" else todayNumeric // تاریخ پیش‌فرض
+                    newTaskDateString = if (selectedItem == 3) "" else todayNumeric
                     newTaskReminderDays = "0"
                     newCategoryName = ""
                     if (selectedCategory.isEmpty()) selectedCategory = defaultCategories[0]
@@ -230,10 +230,9 @@ fun MainScreen() {
                                     val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
                                     taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = recType, recurrenceValue = recValue, dateString = if(selectedItem==3) newTaskDateString else todayNumeric, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
                                 } else {
-                                    // اصلاحیه ۱: اگر کار تکرارشونده است، به جای تغییر کل کار، یک کپی مستقل برای امروز می‌سازیم
                                     if (taskToEdit!!.recurrenceType != "NONE") {
                                         taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = "NONE", dateString = todayNumeric))
-                                        taskDao.updateTask(taskToEdit!!.copy(dateString = "SKIPPED_$todayNumeric")) // مخفی کردن در امروز
+                                        taskDao.updateTask(taskToEdit!!.copy(dateString = "SKIPPED_$todayNumeric"))
                                     } else {
                                         taskDao.updateTask(taskToEdit!!.copy(title = newTaskTitle, priority = newTaskPriority, dateString = newTaskDateString, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
                                     }
@@ -257,7 +256,6 @@ fun MainScreen() {
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        // اگر کار تکرارشونده است، برای فردا یک کپی مستقل می‌سازیم
                         if (taskToPostpone!!.recurrenceType != "NONE") {
                             taskDao.insertTask(TaskEntity(title = taskToPostpone!!.title, priority = taskToPostpone!!.priority, recurrenceType = "NONE", dateString = tomorrowNumeric))
                             taskDao.updateTask(taskToPostpone!!.copy(dateString = "SKIPPED_$todayNumeric"))
@@ -270,7 +268,6 @@ fun MainScreen() {
             },
             dismissButton = {
                 TextButton(onClick = {
-                    // یک هفته بعد
                     scope.launch {
                         if (taskToPostpone!!.recurrenceType != "NONE") {
                             taskDao.insertTask(TaskEntity(title = taskToPostpone!!.title, priority = taskToPostpone!!.priority, recurrenceType = "NONE", dateString = "NEXT_WEEK"))
@@ -295,7 +292,6 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
     val todayDayOfMonth = PersianDate.getDayOfMonthNumber()
     val occasion = PersianDate.getOccasion()
 
-    // اصلاحیه ۱: فیلتر کارهای تکرارشونده که امروز مخفی شده‌اند
     val todayTasks = tasks.filter {
         val isSkippedToday = it.dateString == "SKIPPED_$todayNumeric"
         !isSkippedToday && (
@@ -323,7 +319,6 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
                     Text("امروز", color = Gold, fontSize = 14.sp, fontWeight = FontWeight.Bold)
                     Text(currentDate, color = Color.White, fontSize = 18.sp, fontWeight = FontWeight.Bold)
                     
-                    // اصلاحیه ۵: نمایش تاریخ میلادی، قمری و محاسبه سن
                     Spacer(modifier = Modifier.height(4.dp))
                     Text("میلادی: ${PersianDate.getMiladiDate()} | قمری: ${PersianDate.getQamariDate()}", color = Color.LightGray, fontSize = 11.sp)
                     Text("سن (تولد 1362/09/01): ${PersianDate.getAge()}", color = Gold, fontSize = 12.sp, fontWeight = FontWeight.Medium)
@@ -363,14 +358,7 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
                     showPriority = true, 
                     onEdit = { onEditTask(task) },
                     onPostpone = { onPostpone(task) },
-                    onPriorityChange = { newColor -> scope.launch { 
-                        if(task.recurrenceType != "NONE") {
-                            // برای کارهای تکرارشونده، تغییر رنگ باید در کل تکرار اعمال شود
-                            taskDao.updateTask(task.copy(priority = newColor)) 
-                        } else {
-                            taskDao.updateTask(task.copy(priority = newColor)) 
-                        }
-                    } }
+                    onPriorityChange = { newColor -> scope.launch { taskDao.updateTask(task.copy(priority = newColor)) } }
                 )
             }
         }
@@ -384,7 +372,6 @@ fun WeeklyLogScreen(
 ) {
     val scope = rememberCoroutineScope()
     
-    // اصلاحیه ۸: چیدمان دو ستونی و نمایش تعداد کارها با نقطه
     val rightDays = listOf("شنبه", "یکشنبه", "دوشنبه")
     val leftDays = listOf("سه‌شنبه", "چهارشنبه", "پنجشنبه")
     
@@ -397,22 +384,43 @@ fun WeeklyLogScreen(
         for (i in 0..2) {
             item {
                 Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    DayCard(rightDays[i], selectedDay, onDaySelected, tasks, taskDao, scope, onEditTask, Modifier.weight(1f))
-                    DayCard(leftDays[i], selectedDay, onDaySelected, tasks, taskDao, scope, onEditTask, Modifier.weight(1f))
+                    DayGridCard(rightDays[i], selectedDay, onDaySelected, tasks, Modifier.weight(1f))
+                    DayGridCard(leftDays[i], selectedDay, onDaySelected, tasks, Modifier.weight(1f))
                 }
             }
         }
         // جمعه در مرکز
         item {
             Box(modifier = Modifier.fillMaxWidth(), contentAlignment = Alignment.Center) {
-                DayCard("جمعه", selectedDay, onDaySelected, tasks, taskDao, scope, onEditTask, Modifier.fillMaxWidth(0.6f))
+                DayGridCard("جمعه", selectedDay, onDaySelected, tasks, Modifier.fillMaxWidth(0.6f))
+            }
+        }
+        
+        // خط جداکننده و لیست کارها در پایین
+        item {
+            Divider(modifier = Modifier.padding(vertical = 12.dp), color = Color.LightGray)
+            Text("کارهای روز $selectedDay", fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
+        }
+        
+        val dayTasks = tasks.filter { it.recurrenceType == "WEEKLY" && it.recurrenceValue == selectedDay }
+        if (dayTasks.isEmpty()) {
+            item { Text("هیچ کاری ثبت نشده است.", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
+        } else {
+            items(dayTasks) { task -> 
+                Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), shape = RoundedCornerShape(6.dp)) {
+                    Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
+                        Text(task.title, modifier = Modifier.weight(1f), fontSize = 14.sp)
+                        IconButton(onClick = { onEditTask(task) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, null, tint = Color.Blue, modifier = Modifier.size(16.dp)) }
+                        IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
+                    }
+                }
             }
         }
     }
 }
 
 @Composable
-fun DayCard(day: String, selectedDay: String, onDaySelected: (String) -> Unit, tasks: List<TaskEntity>, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, onEditTask: (TaskEntity) -> Unit, modifier: Modifier = Modifier) {
+fun DayGridCard(day: String, selectedDay: String, onDaySelected: (String) -> Unit, tasks: List<TaskEntity>, modifier: Modifier = Modifier) {
     val dayTasks = tasks.filter { it.recurrenceType == "WEEKLY" && it.recurrenceValue == day }
     Card(
         modifier = modifier.padding(vertical = 4.dp),
@@ -421,23 +429,16 @@ fun DayCard(day: String, selectedDay: String, onDaySelected: (String) -> Unit, t
         elevation = CardDefaults.cardElevation(1.dp),
         shape = RoundedCornerShape(8.dp)
     ) {
-        Column(modifier = Modifier.clickable { onDaySelected(day) }.padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally) {
+        Column(modifier = Modifier.clickable { onDaySelected(day) }.padding(12.dp), horizontalAlignment = Alignment.CenterHorizontally) {
             Text(day, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
             
-            // نمایش نقطه به تعداد کارها
-            Row(modifier = Modifier.padding(vertical = 4.dp), horizontalArrangement = Arrangement.Center) {
-                val count = dayTasks.size.coerceAtMost(5)
-                repeat(count) {
-                    Box(modifier = Modifier.padding(horizontal = 1.dp).size(6.dp).background(EisenhowerOrange, CircleShape))
-                }
-            }
-
-            // اصلاحیه ۳: حذف تیک، فقط ویرایش و حذف
-            dayTasks.forEach { task -> 
-                Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween, verticalAlignment = Alignment.CenterVertically) {
-                    Text(task.title, fontSize = 10.sp, modifier = Modifier.weight(1f), maxLines = 1)
-                    IconButton(onClick = { onEditTask(task) }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Edit, null, tint = Color.Blue, modifier = Modifier.size(14.dp)) }
-                    IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(24.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(14.dp)) }
+            if (dayTasks.isNotEmpty()) {
+                Spacer(modifier = Modifier.height(6.dp))
+                Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center) {
+                    val count = dayTasks.size.coerceAtMost(4)
+                    repeat(count) {
+                        Box(modifier = Modifier.padding(horizontal = 1.dp).size(6.dp).background(EisenhowerOrange, CircleShape))
+                    }
                 }
             }
         }
@@ -450,7 +451,6 @@ fun MonthlyLogScreen(
     selectedDay: String, onDaySelected: (String) -> Unit, onEditTask: (TaskEntity) -> Unit
 ) {
     val scope = rememberCoroutineScope()
-    // اصلاحیه ۴: لیست مستقل از ۱ تا ۳۱
     val days = (1..31).map { it.toString() }
     val weekDays = listOf("ش", "ی", "د", "س", "چ", "پ", "ج")
 
@@ -472,7 +472,6 @@ fun MonthlyLogScreen(
                             val isSelected = dayStr == selectedDay
                             val taskCount = tasks.count { it.recurrenceType == "MONTHLY" && it.recurrenceValue == dayStr }
                             
-                            // اصلاحیه ۶: نمایش نقطه نارنجی به تعداد کارها
                             Box(
                                 modifier = Modifier.size(40.dp).clip(CircleShape).background(if (isSelected) DarkEmerald else Color.Transparent)
                                     .border(if (isSelected) 0.dp else 1.dp, if (isSelected) Color.Transparent else Color.LightGray.copy(alpha=0.5f), CircleShape)
@@ -489,7 +488,6 @@ fun MonthlyLogScreen(
                                 }
                             }
                         }
-                        // پر کردن روزهای خالی ردیف آخر
                         if (week.size < 7) {
                             repeat(7 - week.size) { Box(modifier = Modifier.size(40.dp)) }
                         }
@@ -506,7 +504,6 @@ fun MonthlyLogScreen(
         if (monthDayTasks.isEmpty()) {
             item { Text("هیچ کاری ثبت نشده است.", color = Color.Gray, fontSize = 12.sp, modifier = Modifier.padding(top = 8.dp)) }
         } else {
-            // اصلاحیه ۳: حذف تیک در ماه‌نگار
             items(monthDayTasks) { task -> 
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), shape = RoundedCornerShape(6.dp)) {
                     Row(modifier = Modifier.padding(8.dp), verticalAlignment = Alignment.CenterVertically) {
@@ -538,7 +535,6 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Cream), shape = RoundedCornerShape(8.dp)) {
                         Column(modifier = Modifier.padding(8.dp)) {
                             Text(date, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
-                            // اصلاحیه ۳: حذف تیک در آینده‌نگار
                             dateTasks.forEach { task -> 
                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
                                     Text(task.title, modifier = Modifier.weight(1f), fontSize = 14.sp)
@@ -589,7 +585,6 @@ fun CollectionScreen(
                                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Color.White), shape = RoundedCornerShape(6.dp)) {
                                     Row(modifier = Modifier.padding(horizontal = 8.dp, vertical = 2.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                                         
-                                        // اصلاحیه ۷: جایگزینی آیکون تیک با چک‌باکس مربعی
                                         Checkbox(
                                             checked = item.isCompleted,
                                             onCheckedChange = { scope.launch { collectionDao.updateItem(item.copy(isCompleted = it)) } },
@@ -641,17 +636,14 @@ fun CompactTaskItem(
             }
             Text(text = task.title, fontSize = 14.sp, color = if (task.isCompleted) Color.Gray else Color.Black, textDecoration = if (task.isCompleted) TextDecoration.LineThrough else TextDecoration.None, modifier = Modifier.weight(1f))
             
-            // دکمه موکول کردن (اصلاحیه ۲)
             IconButton(onClick = onPostpone, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.ArrowForward, "موکول", tint = Color.DarkGray, modifier = Modifier.size(18.dp)) 
             }
             
             IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
             
-            // دکمه تیک (فقط در روزنگار)
             IconButton(onClick = { 
                 scope.launch { 
-                    // اصلاحیه ۱: کار تکرارشونده در روزنگار تیک می‌خورد، فقط برای امروز مخفی می‌شود
                     if (task.recurrenceType != "NONE") {
                         taskDao.updateTask(task.copy(dateString = "SKIPPED_${PersianDate.getCurrentDateNumeric()}"))
                     } else {
