@@ -2,10 +2,62 @@ package ir.boltjournal.app
 
 import java.time.LocalDate
 import java.time.ZoneId
+import java.time.chrono.HijrahDate
+import java.time.format.DateTimeFormatter
 
 object PersianDate {
     
+    // خروجی به صورت 1405/08/29 برای مقایسه دقیق
+    fun getCurrentDateNumeric(): String {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        val persian = getPersianDateFromDate(today)
+        val parts = persian.split("، ")[1].split(" ") // ["29", "آبان", "1405"]
+        return "${parts[2]}/${monthToNumber(parts[1])}/${parts[0]}"
+    }
+
+    // تاریخ فردا
+    fun getTomorrowDateNumeric(): String {
+        val tomorrow = LocalDate.now(ZoneId.of("Asia/Tehran")).plusDays(1)
+        val persian = getPersianDateFromDate(tomorrow)
+        val parts = persian.split("، ")[1].split(" ")
+        return "${parts[2]}/${monthToNumber(parts[1])}/${parts[0]}"
+    }
+
     fun getCurrentPersianDate(): String = getPersianDateFromDate(LocalDate.now(ZoneId.of("Asia/Tehran")))
+
+    fun getMiladiDate(): String {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        return today.format(DateTimeFormatter.ofPattern("yyyy/MM/dd"))
+    }
+
+    fun getQamariDate(): String {
+        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
+        val hijri = HijrahDate.from(today)
+        val months = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذیقعده", "ذیحجه")
+        return "${hijri.dayOfMonth} ${months[hijri.monthValue - 1]} ${hijri.year}"
+    }
+
+    // محاسبه سن برای تاریخ تولد 1362/09/01
+    fun getAge(): String {
+        val todayNumeric = getCurrentDateNumeric().split("/")
+        val todayY = todayNumeric[0].toInt(); val todayM = todayNumeric[1].toInt(); val todayD = todayNumeric[2].toInt()
+        
+        val birthY = 1362; val birthM = 9; val birthD = 1
+        
+        var years = todayY - birthY
+        var months = todayM - birthM
+        var days = todayD - birthD
+        
+        if (days < 0) {
+            months--
+            days += 30 // تقریب ساده برای روزهای ماه
+        }
+        if (months < 0) {
+            years--
+            months += 12
+        }
+        return "$years سال و $months ماه و $days روز"
+    }
 
     fun getDayOfWeekName(): String {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
@@ -14,16 +66,12 @@ object PersianDate {
     }
 
     fun getDayOfMonthNumber(): String {
-        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val persian = getPersianDateFromDate(today)
-        return persian.split("، ")[1].split(" ")[0] 
+        val parts = getCurrentDateNumeric().split("/")
+        return parts[2].toInt().toString()
     }
 
     fun getOccasion(): String {
-        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val persian = getPersianDateFromDate(today)
-        val monthDay = persian.split("، ")[1] 
-        
+        val monthDay = getPersianDateFromDate(LocalDate.now(ZoneId.of("Asia/Tehran"))).split("، ")[1]
         return when {
             monthDay == "1 فروردین" -> "عید نوروز"
             monthDay == "13 فروردین" -> "روز طبیعت"
@@ -34,67 +82,10 @@ object PersianDate {
         }
     }
 
-    fun getCurrentWeekDates(): List<String> {
-        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val daysSinceSaturday = (today.dayOfWeek.value + 1) % 7 
-        val saturday = today.minusDays(daysSinceSaturday.toLong())
-        return (0..6).map { getPersianDateFromDate(saturday.plusDays(it.toLong())) }
-    }
-
-    fun getCurrentMonthYear(): String {
-        val persian = getCurrentPersianDate() 
-        return persian.substringAfter("، ").substringAfter(" ") 
-    }
-
-    // الگوریتم جدید و دقیق برای پیدا کردن تمام روزهای ماه
-    fun getCurrentMonthGrid(): List<Pair<Int, String>?> {
-        val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
-        val targetMonthYear = getCurrentMonthYear()
-        val dates = mutableListOf<Pair<Int, String>>()
-
-        // بررسی ۴۵ روز قبل تا ۴۵ روز بعد از امروز برای پیدا کردن تمام روزهای این ماه
-        for (i in -45..45) {
-            val date = today.plusDays(i.toLong())
-            val persian = getPersianDateFromDate(date)
-            if (persian.endsWith(targetMonthYear)) {
-                val dayNum = persian.split("، ")[1].split(" ")[0].toIntOrNull() ?: 0
-                // جلوگیری از تکراری بودن
-                if (!dates.any { it.first == dayNum }) {
-                    dates.add(Pair(dayNum, persian))
-                }
-            }
-        }
-        
-        // مرتب‌سازی بر اساس شماره روز (۱ تا ۳۱)
-        dates.sortBy { it.first }
-
-        if (dates.isEmpty()) return emptyList()
-
-        // پیدا کردن روز شروع ماه (مثلا اگر ۱ ماه شنبه باشد، آفست ۰ است)
-        val startOffset = when(dates.first().second.split("، ")[0]) {
-            "شنبه" -> 0
-            "یکشنبه" -> 1
-            "دوشنبه" -> 2
-            "سه‌شنبه" -> 3
-            "چهارشنبه" -> 4
-            "پنجشنبه" -> 5
-            "جمعه" -> 6
-            else -> 0
-        }
-
-        val grid = mutableListOf<Pair<Int, String>?>()
-        // اضافه کردن خانه‌های خالی در ابتدا
-        for (i in 0 until startOffset) grid.add(null)
-        
-        // اضافه کردن روزهای ماه
-        grid.addAll(dates)
-        
-        // پر کردن انتهای جدول با خانه خالی تا تعداد خانه‌ها مضربی از ۷ شود (برای زیبایی گرید)
-        while (grid.size % 7 != 0) {
-            grid.add(null)
-        }
-
-        return grid
+    private fun monthToNumber(monthName: String): String {
+        val months = arrayOf("فروردین", "اردیبهشت", "خرداد", "تیر", "مرداد", "شهریور", "مهر", "آبان", "آذر", "دی", "بهمن", "اسفند")
+        val index = months.indexOf(monthName) + 1
+        return if (index < 10) "0$index" else index.toString()
     }
 
     private fun getPersianDateFromDate(date: LocalDate): String {
