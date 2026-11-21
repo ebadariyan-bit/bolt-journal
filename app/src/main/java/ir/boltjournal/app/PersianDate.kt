@@ -4,6 +4,7 @@ import java.time.LocalDate
 import java.time.ZoneId
 import java.time.chrono.HijrahDate
 import java.time.format.DateTimeFormatter
+import java.time.temporal.ChronoField
 
 object PersianDate {
     
@@ -34,7 +35,13 @@ object PersianDate {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val hijri = HijrahDate.from(today)
         val months = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذیقعده", "ذیحجه")
-        return "${hijri.dayOfMonth} ${months[hijri.monthValue - 1]} ${hijri.year}"
+        
+        // استفاده از ChronoField برای جلوگیری از خطای کامپایل
+        val day = hijri.get(ChronoField.DAY_OF_MONTH)
+        val month = hijri.get(ChronoField.MONTH_OF_YEAR)
+        val year = hijri.get(ChronoField.YEAR)
+        
+        return "$day ${months[month - 1]} $year"
     }
 
     // محاسبه سن برای تاریخ تولد 1362/09/01
