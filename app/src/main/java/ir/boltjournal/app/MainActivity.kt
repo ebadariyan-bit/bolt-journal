@@ -3,6 +3,7 @@ package ir.boltjournal.app
 import android.os.Bundle
 import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
+import androidx.compose.foundation.Canvas
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.clickable
@@ -18,6 +19,7 @@ import androidx.compose.runtime.*
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
@@ -28,6 +30,8 @@ import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
 import androidx.compose.ui.unit.sp
 import kotlinx.coroutines.launch
+import kotlin.math.cos
+import kotlin.math.sin
 
 val DarkEmerald = Color(0xFF1B5E20)
 val Cream = Color(0xFFFDFBF7)
@@ -358,7 +362,8 @@ fun DailyLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDa
                     showPriority = true, 
                     onEdit = { onEditTask(task) },
                     onPostpone = { onPostpone(task) },
-                    onPriorityChange = { newColor -> scope.launch { taskDao.updateTask(task.copy(priority = newColor)) } }
+                    onPriorityChange = { newColor -> scope.launch { taskDao.updateTask(task.copy(priority = newColor)) } },
+                    showTick = false // تیک در روزنگار حذف شد
                 )
             }
         }
@@ -432,7 +437,6 @@ fun DayGridCard(day: String, selectedDay: String, onDaySelected: (String) -> Uni
             if (dayTasks.isNotEmpty()) {
                 Spacer(modifier = Modifier.height(6.dp))
                 Row(modifier = Modifier.padding(vertical = 2.dp), horizontalArrangement = Arrangement.Center) {
-                    // محدودیت حذف شد و به تعداد کل تسک‌ها دایره نمایش داده می‌شود
                     repeat(dayTasks.size) {
                         Box(modifier = Modifier.padding(horizontal = 1.dp).size(6.dp).background(EisenhowerOrange, CircleShape))
                     }
@@ -463,24 +467,34 @@ fun MonthlyLogScreen(
                             val taskCount = tasks.count { it.recurrenceType == "MONTHLY" && it.recurrenceValue == dayStr }
                             
                             Box(
-                                modifier = Modifier.size(40.dp).clip(CircleShape).background(if (isSelected) DarkEmerald else Color.Transparent)
+                                modifier = Modifier.size(44.dp).clip(CircleShape).background(if (isSelected) DarkEmerald else Color.Transparent)
                                     .border(if (isSelected) 0.dp else 1.dp, if (isSelected) Color.Transparent else Color.LightGray.copy(alpha=0.5f), CircleShape)
                                     .clickable { onDaySelected(dayStr) },
                                 contentAlignment = Alignment.Center
                             ) {
                                 Text(dayStr, color = if (isSelected) Color.White else Color.Black, fontSize = 14.sp, fontWeight = if (isSelected) FontWeight.Bold else FontWeight.Normal)
+                                
+                                // رسم دایره‌های نارنجی به صورت حلقه‌ای دور عدد
                                 if (taskCount > 0) {
-                                    Row(modifier = Modifier.align(Alignment.BottomCenter).padding(bottom = 2.dp), horizontalArrangement = Arrangement.Center) {
-                                        // محدودیت حذف شد و به تعداد کل تسک‌ها دایره نمایش داده می‌شود
-                                        repeat(taskCount) {
-                                            Box(modifier = Modifier.padding(horizontal = 0.5.dp).size(4.dp).background(EisenhowerOrange, CircleShape))
+                                    Canvas(modifier = Modifier.matchParentSize()) {
+                                        val radius = size.minDimension / 2f
+                                        val dotRadius = 2.5.dp.toPx()
+                                        val angleStep = (2 * Math.PI / taskCount).toFloat()
+                                        val startAngle = (-Math.PI / 2).toFloat()
+                                        
+                                        for (i in 0 until taskCount) {
+                                            val angle = startAngle + i * angleStep
+                                            // محاسبه موقعیت نقطه روی محیط دایره
+                                            val x = center.x + (radius - dotRadius - 2.dp.toPx()) * cos(angle)
+                                            val y = center.y + (radius - dotRadius - 2.dp.toPx()) * sin(angle)
+                                            drawCircle(color = EisenhowerOrange, radius = dotRadius, center = Offset(x, y))
                                         }
                                     }
                                 }
                             }
                         }
                         if (week.size < 7) {
-                            repeat(7 - week.size) { Box(modifier = Modifier.size(40.dp)) }
+                            repeat(7 - week.size) { Box(modifier = Modifier.size(44.dp)) }
                         }
                     }
                     Spacer(modifier = Modifier.height(6.dp))
@@ -511,7 +525,10 @@ fun MonthlyLogScreen(
 @Composable
 fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskDao: TaskDao, onEditTask: (TaskEntity) -> Unit) {
     val scope = rememberCoroutineScope()
-    val futureTasks = tasks.filter { it.dateString.isNotEmpty() && !it.dateString.startsWith("SKIPPED") }.sortedBy { it.dateString }
+    val todayNumeric = PersianDate.getCurrentDateNumeric()
+    
+    // فقط کارهایی که تاریخشان بزرگ‌تر از امروز است
+    val futureTasks = tasks.filter { it.dateString.isNotEmpty() && !it.dateString.startsWith("SKIPPED") && it.dateString > todayNumeric }.sortedBy { it.dateString }
 
     LazyColumn(
         modifier = Modifier.fillMaxSize().padding(paddingValues),
@@ -525,10 +542,13 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                 item {
                     Card(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), colors = CardDefaults.cardColors(containerColor = Cream), shape = RoundedCornerShape(8.dp)) {
                         Column(modifier = Modifier.padding(8.dp)) {
-                            Text(date, fontWeight = FontWeight.Bold, color = DarkEmerald, fontSize = 14.sp)
                             dateTasks.forEach { task -> 
                                 Row(modifier = Modifier.fillMaxWidth().padding(vertical = 4.dp), verticalAlignment = Alignment.CenterVertically) {
-                                    Text(task.title, modifier = Modifier.weight(1f), fontSize = 14.sp)
+                                    
+                                    // قالب جدید: تاریخ - عنوان (یادآور)
+                                    val reminderText = if (task.reminderDays > 0) " (یادآور از ${task.reminderDays} روز قبل فعال است)" else ""
+                                    Text("$date - ${task.title}$reminderText", modifier = Modifier.weight(1f), fontSize = 14.sp, color = Color.Black)
+                                    
                                     IconButton(onClick = { onEditTask(task) }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, null, tint = Color.Blue, modifier = Modifier.size(16.dp)) }
                                     IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, null, tint = Color.Red, modifier = Modifier.size(16.dp)) }
                                 }
@@ -607,7 +627,8 @@ fun CollectionScreen(
 @Composable
 fun CompactTaskItem(
     task: TaskEntity, taskDao: TaskDao, scope: kotlinx.coroutines.CoroutineScope, 
-    showPriority: Boolean, onEdit: () -> Unit, onPostpone: () -> Unit, onPriorityChange: (String) -> Unit = {}
+    showPriority: Boolean, onEdit: () -> Unit, onPostpone: () -> Unit, onPriorityChange: (String) -> Unit = {},
+    showTick: Boolean = true // پارامتر جدید برای کنترل نمایش تیک
 ) {
     val color = when(task.priority) { "RED" -> EisenhowerRed; "GREEN" -> EisenhowerGreen; "ORANGE" -> EisenhowerOrange; else -> EisenhowerGray }
 
@@ -633,15 +654,18 @@ fun CompactTaskItem(
             
             IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
             
-            IconButton(onClick = { 
-                scope.launch { 
-                    if (task.recurrenceType != "NONE") {
-                        taskDao.updateTask(task.copy(dateString = "SKIPPED_${PersianDate.getCurrentDateNumeric()}"))
-                    } else {
-                        taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) 
-                    }
-                } 
-            }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
+            // نمایش تیک فقط اگر مجاز باشد (در روزنگار غیرفعال شده)
+            if (showTick) {
+                IconButton(onClick = { 
+                    scope.launch { 
+                        if (task.recurrenceType != "NONE") {
+                            taskDao.updateTask(task.copy(dateString = "SKIPPED_${PersianDate.getCurrentDateNumeric()}"))
+                        } else {
+                            taskDao.updateTask(task.copy(isCompleted = !task.isCompleted)) 
+                        }
+                    } 
+                }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Check, "انجام", tint = if (task.isCompleted) Color.Green else Color.LightGray, modifier = Modifier.size(18.dp)) }
+            }
             
             IconButton(onClick = { scope.launch { taskDao.deleteTask(task) } }, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
         }
