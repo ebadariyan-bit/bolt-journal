@@ -8,20 +8,34 @@ import java.time.temporal.ChronoField
 
 object PersianDate {
     
-    // خروجی به صورت 1405/08/29 برای مقایسه دقیق
+    // خروجی همیشه با فرمت YYYY/MM/DD (با صفر)
     fun getCurrentDateNumeric(): String {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val persian = getPersianDateFromDate(today)
-        val parts = persian.split("، ")[1].split(" ") // ["29", "آبان", "1405"]
-        return "${parts[2]}/${monthToNumber(parts[1])}/${parts[0]}"
+        val parts = persian.split("، ")[1].split(" ") // ["03", "آبان", "1405"]
+        val dayPadded = parts[0].padStart(2, '0')
+        return "${parts[2]}/${monthToNumber(parts[1])}/$dayPadded"
     }
 
-    // تاریخ فردا
     fun getTomorrowDateNumeric(): String {
         val tomorrow = LocalDate.now(ZoneId.of("Asia/Tehran")).plusDays(1)
         val persian = getPersianDateFromDate(tomorrow)
         val parts = persian.split("، ")[1].split(" ")
-        return "${parts[2]}/${monthToNumber(parts[1])}/${parts[0]}"
+        val dayPadded = parts[0].padStart(2, '0')
+        return "${parts[2]}/${monthToNumber(parts[1])}/$dayPadded"
+    }
+
+    // این تابع هر تاریخی که کاربر وارد کند را استانداردسازی می‌کند
+    fun normalizeDateInput(input: String): String {
+        val cleaned = input.replace("-", "/").trim()
+        val parts = cleaned.split("/")
+        if (parts.size == 3) {
+            val y = parts[0]
+            val m = parts[1].padStart(2, '0')
+            val d = parts[2].padStart(2, '0')
+            return "$y/$m/$d"
+        }
+        return cleaned
     }
 
     fun getCurrentPersianDate(): String = getPersianDateFromDate(LocalDate.now(ZoneId.of("Asia/Tehran")))
@@ -35,34 +49,21 @@ object PersianDate {
         val today = LocalDate.now(ZoneId.of("Asia/Tehran"))
         val hijri = HijrahDate.from(today)
         val months = arrayOf("محرم", "صفر", "ربیع‌الاول", "ربیع‌الثانی", "جمادی‌الاول", "جمادی‌الثانی", "رجب", "شعبان", "رمضان", "شوال", "ذیقعده", "ذیحجه")
-        
-        // استفاده از ChronoField برای جلوگیری از خطای کامپایل
         val day = hijri.get(ChronoField.DAY_OF_MONTH)
         val month = hijri.get(ChronoField.MONTH_OF_YEAR)
         val year = hijri.get(ChronoField.YEAR)
-        
         return "$day ${months[month - 1]} $year"
     }
 
-    // محاسبه سن برای تاریخ تولد 1362/09/01
     fun getAge(): String {
         val todayNumeric = getCurrentDateNumeric().split("/")
         val todayY = todayNumeric[0].toInt(); val todayM = todayNumeric[1].toInt(); val todayD = todayNumeric[2].toInt()
-        
         val birthY = 1362; val birthM = 9; val birthD = 1
-        
         var years = todayY - birthY
         var months = todayM - birthM
         var days = todayD - birthD
-        
-        if (days < 0) {
-            months--
-            days += 30 // تقریب ساده برای روزهای ماه
-        }
-        if (months < 0) {
-            years--
-            months += 12
-        }
+        if (days < 0) { months--; days += 30 }
+        if (months < 0) { years--; months += 12 }
         return "$years سال و $months ماه و $days روز"
     }
 
@@ -74,7 +75,7 @@ object PersianDate {
 
     fun getDayOfMonthNumber(): String {
         val parts = getCurrentDateNumeric().split("/")
-        return parts[2].toInt().toString()
+        return parts[2].toInt().toString() // بدون صفر برای ماه‌نگار
     }
 
     fun getOccasion(): String {
