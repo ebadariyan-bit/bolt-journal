@@ -24,7 +24,6 @@ import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
 import androidx.compose.ui.platform.LocalLayoutDirection
 import androidx.compose.ui.text.font.FontWeight
-import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextDecoration
 import androidx.compose.ui.unit.LayoutDirection
 import androidx.compose.ui.unit.dp
@@ -132,7 +131,6 @@ fun MainScreen() {
         showPostponeDialog = true
     }
 
-    // ** عملیات حذف در روزنگار **
     val handleDeleteDailyTask: (TaskEntity) -> Unit = { task ->
         scope.launch {
             if (task.recurrenceType != "NONE") {
@@ -141,10 +139,9 @@ fun MainScreen() {
                     title = task.title, 
                     dateString = "SKIPPED_$todayNumeric", 
                     recurrenceType = "NONE",
-                    isCompleted = true // علامت اینکه این کار فقط یک برچسب مخفی‌سازی است
+                    isCompleted = true 
                 ))
             } else {
-                // اگر کار دستی است، کلاً حذف شود
                 taskDao.deleteTask(task)
             }
         }
@@ -250,13 +247,18 @@ fun MainScreen() {
                                 if (taskToEdit == null) {
                                     val recType = when(selectedItem) { 1 -> "WEEKLY"; 2 -> "MONTHLY"; else -> "NONE" }
                                     val recValue = when(selectedItem) { 1 -> selectedWeekDay; 2 -> selectedMonthDay; else -> "" }
-                                    taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = recType, recurrenceValue = recValue, dateString = if(selectedItem==3) newTaskDateString else todayNumeric, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
+                                    
+                                    // اصلاح تاریخ ورودی برای آینده‌نگار
+                                    val finalDateStr = if(selectedItem==3) PersianDate.normalizeDateInput(newTaskDateString) else todayNumeric
+                                    
+                                    taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = recType, recurrenceValue = recValue, dateString = finalDateStr, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
                                 } else {
                                     if (taskToEdit!!.recurrenceType != "NONE") {
                                         taskDao.insertTask(TaskEntity(title = newTaskTitle, priority = newTaskPriority, recurrenceType = "NONE", dateString = todayNumeric))
                                         taskDao.insertTask(TaskEntity(title = taskToEdit!!.title, dateString = "SKIPPED_$todayNumeric", recurrenceType = "NONE")) 
                                     } else {
-                                        taskDao.updateTask(taskToEdit!!.copy(title = newTaskTitle, priority = newTaskPriority, dateString = newTaskDateString, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
+                                        val finalDateStr = if(selectedItem==3) PersianDate.normalizeDateInput(newTaskDateString) else newTaskDateString
+                                        taskDao.updateTask(taskToEdit!!.copy(title = newTaskTitle, priority = newTaskPriority, dateString = finalDateStr, reminderDays = newTaskReminderDays.toIntOrNull() ?: 0))
                                     }
                                 }
                             }
@@ -278,13 +280,11 @@ fun MainScreen() {
             confirmButton = {
                 TextButton(onClick = {
                     scope.launch {
-                        // ۱. ایجاد یک کپی برای فردا (به صورت کار دستی)
                         taskDao.insertTask(TaskEntity(title = taskToPostpone!!.title, priority = taskToPostpone!!.priority, recurrenceType = "NONE", dateString = tomorrowNumeric))
-                        // ۲. اگر کار تکرارشونده است، برای امروز مخفی شود
                         if (taskToPostpone!!.recurrenceType != "NONE") {
                             taskDao.insertTask(TaskEntity(title = taskToPostpone!!.title, dateString = "SKIPPED_$todayNumeric", recurrenceType = "NONE"))
                         } else {
-                            taskDao.deleteTask(taskToPostpone!!) // اگر دستی بود، از امروز حذف شود
+                            taskDao.deleteTask(taskToPostpone!!)
                         }
                         showPostponeDialog = false
                     }
@@ -319,18 +319,12 @@ fun DailyLogScreen(
     val todayDayOfMonth = PersianDate.getDayOfMonthNumber()
     val occasion = PersianDate.getOccasion()
 
-    // لیست عناوینی که برای امروز مخفی شده‌اند
     val skippedTitles = tasks.filter { it.dateString == "SKIPPED_$todayNumeric" }.map { it.title }
 
     val todayTasks = tasks.filter {
-        // کارهای مستقیم و دستی امروز
         val isDirect = it.recurrenceType == "NONE" && it.dateString == todayNumeric
-        // کارهای هفتگی امروز
         val isWeekly = it.recurrenceType == "WEEKLY" && it.recurrenceValue == todayDayOfWeek && !skippedTitles.contains(it.title)
-        // کارهای ماهانه امروز
         val isMonthly = it.recurrenceType == "MONTHLY" && it.recurrenceValue == todayDayOfMonth && !skippedTitles.contains(it.title)
-        
-        // آیا این کار خودِ برچسب مخفی‌سازی است؟ (نباید نمایش داده شود)
         val isSkipMarker = it.dateString.startsWith("SKIPPED_")
         
         !isSkipMarker && (isDirect || isWeekly || isMonthly)
@@ -386,7 +380,6 @@ fun DailyLogScreen(
             item { Box(modifier = Modifier.fillMaxWidth().padding(32.dp), contentAlignment = Alignment.Center) { Text("هیچ کاری ثبت نشده است.", color = Color.Gray) } }
         } else {
             items(sortedTasks) { task ->
-                // در روزنگار فقط دکمه‌های انتقال، ویرایش و حذف وجود دارند
                 DailyTaskItem(
                     task = task, 
                     scope = scope, 
@@ -422,15 +415,12 @@ fun DailyTaskItem(
             
             Text(text = task.title, fontSize = 14.sp, color = Color.Black, modifier = Modifier.weight(1f))
             
-            // دکمه انتقال به آینده (موکول)
             IconButton(onClick = onPostpone, modifier = Modifier.size(30.dp)) { 
                 Icon(Icons.Default.ArrowForward, "انتقال", tint = Color.DarkGray, modifier = Modifier.size(18.dp)) 
             }
             
-            // دکمه ویرایش
             IconButton(onClick = onEdit, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Edit, "ویرایش", tint = Color.Blue, modifier = Modifier.size(16.dp)) }
             
-            // دکمه حذف
             IconButton(onClick = onDelete, modifier = Modifier.size(30.dp)) { Icon(Icons.Default.Delete, "حذف", tint = Color.Red, modifier = Modifier.size(18.dp)) }
         }
     }
@@ -591,7 +581,6 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
     val scope = rememberCoroutineScope()
     val todayNumeric = PersianDate.getCurrentDateNumeric()
     
-    // فیلتر دقیق: فقط کارهایی که تاریخشان بزرگ‌تر از امروز است و جزو برچسب‌های مخفی نیستند
     val futureTasks = tasks.filter { 
         it.dateString.isNotEmpty() && 
         !it.dateString.startsWith("SKIPPED") && 
@@ -611,7 +600,6 @@ fun FutureLogScreen(paddingValues: PaddingValues, tasks: List<TaskEntity>, taskD
                 Card(modifier = Modifier.fillMaxWidth().padding(vertical = 2.dp), colors = CardDefaults.cardColors(containerColor = Cream), shape = RoundedCornerShape(6.dp)) {
                     Row(modifier = Modifier.padding(12.dp).fillMaxWidth(), verticalAlignment = Alignment.CenterVertically) {
                         
-                        // قالب دقیق: تاریخ - عنوان (یادآور)
                         val reminderText = if (task.reminderDays > 0) " (یادآور از ${task.reminderDays} روز قبل فعال است)" else ""
                         Text(
                             text = "${task.dateString} - ${task.title}$reminderText", 
